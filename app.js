@@ -466,20 +466,29 @@
     var logo = createLogo(station.name, station.logoUrl, "station-logo station-logo-list");
     var title = createElement("h2", "station-title", station.name || "Radio senza nome");
     var actions = createElement("div", "station-actions");
-    var playButton = createElement("button", "button button-primary", "Play");
-    var editButton = createElement("button", "button button-secondary", "Modifica");
+    var playButton = createElement("button", "button saved-icon-button saved-play-button", "");
+    var playIcon = createElement("span", "", "▶");
+    var editButton = createElement("button", "button saved-icon-button saved-edit-button", "");
+    var editIcon = createElement("span", "", "✎");
 
     playButton.type = "button";
+    playButton.title = "Play";
+    playButton.setAttribute("aria-label", "Play " + (station.name || "questa radio"));
     playButton.addEventListener("click", function () {
       playStation(station);
     });
 
     editButton.type = "button";
+    editButton.title = "Modifica";
     editButton.setAttribute("aria-label", "Modifica " + (station.name || "questa radio"));
     editButton.addEventListener("click", function () {
       startEdit(station.id);
     });
 
+    playIcon.setAttribute("aria-hidden", "true");
+    editIcon.setAttribute("aria-hidden", "true");
+    playButton.appendChild(playIcon);
+    editButton.appendChild(editIcon);
     actions.appendChild(playButton);
     actions.appendChild(editButton);
     card.appendChild(logo);

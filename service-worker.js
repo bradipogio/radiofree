@@ -1,9 +1,9 @@
-const CACHE_NAME = "le-mie-radio-static-v2";
+const CACHE_NAME = "le-mie-radio-static-v3";
 const APP_ASSETS = [
   "./",
   "./index.html",
-  "./style.css?v=20260520-2",
-  "./app.js?v=20260520-2",
+  "./style.css?v=20260520-3",
+  "./app.js?v=20260520-3",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png"
