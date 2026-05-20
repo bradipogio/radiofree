@@ -18,7 +18,9 @@
     editingId: null,
     storageAvailable: true,
     storageCorrupted: false,
-    messageTimer: null
+    messageTimer: null,
+    searchTimer: null,
+    searchRequestId: 0
   };
 
   var els = {};
@@ -96,6 +98,7 @@
     els.deleteEditBtn.addEventListener("click", handleDeleteFromEdit);
 
     els.searchForm.addEventListener("submit", handleSearchSubmit);
+    els.searchQuery.addEventListener("input", handleSearchInput);
     els.exportJsonBtn.addEventListener("click", exportStationsJson);
     els.importFile.addEventListener("change", handleImportFile);
     els.importTextBtn.addEventListener("click", handleImportText);
@@ -460,12 +463,11 @@
 
   function createSavedStationCard(station) {
     var card = createElement("article", "station-card saved-station-card");
+    var logo = createLogo(station.name, station.logoUrl, "station-logo station-logo-list");
     var title = createElement("h2", "station-title", station.name || "Radio senza nome");
     var actions = createElement("div", "station-actions");
     var playButton = createElement("button", "button button-primary", "Play");
-    var editButton = createElement("button", "button icon-button", "");
-    var editIcon = createElement("span", "", "✎");
-    var editLabel = createElement("span", "visually-hidden", "Modifica o elimina " + (station.name || "questa radio"));
+    var editButton = createElement("button", "button button-secondary", "Modifica");
 
     playButton.type = "button";
     playButton.addEventListener("click", function () {
@@ -473,17 +475,14 @@
     });
 
     editButton.type = "button";
-    editButton.title = "Modifica o elimina";
-    editButton.setAttribute("aria-label", "Modifica o elimina " + (station.name || "questa radio"));
+    editButton.setAttribute("aria-label", "Modifica " + (station.name || "questa radio"));
     editButton.addEventListener("click", function () {
       startEdit(station.id);
     });
 
-    editIcon.setAttribute("aria-hidden", "true");
-    editButton.appendChild(editIcon);
-    editButton.appendChild(editLabel);
     actions.appendChild(playButton);
     actions.appendChild(editButton);
+    card.appendChild(logo);
     card.appendChild(title);
     card.appendChild(actions);
     return card;
@@ -698,11 +697,50 @@
 
   async function handleSearchSubmit(event) {
     event.preventDefault();
+    window.clearTimeout(state.searchTimer);
+    performSearch(cleanText(els.searchQuery.value), true);
+  }
+
+  function handleSearchInput() {
     var query = cleanText(els.searchQuery.value);
+    state.searchRequestId += 1;
+
+    if (!query) {
+      window.clearTimeout(state.searchTimer);
+      clearElement(els.searchResults);
+      setSearchStatus("");
+      els.searchButton.disabled = false;
+      return;
+    }
+
+    if (query.length < 2) {
+      window.clearTimeout(state.searchTimer);
+      clearElement(els.searchResults);
+      setSearchStatus("Continua a scrivere per cercare.");
+      els.searchButton.disabled = false;
+      return;
+    }
+
+    window.clearTimeout(state.searchTimer);
+    state.searchTimer = window.setTimeout(function () {
+      performSearch(query, false);
+    }, 450);
+  }
+
+  async function performSearch(query, focusIfEmpty) {
+    var requestId = state.searchRequestId + 1;
+    state.searchRequestId = requestId;
 
     if (!query) {
       setSearchStatus("Scrivi il nome di una radio o un genere da cercare.");
-      els.searchQuery.focus();
+      if (focusIfEmpty) {
+        els.searchQuery.focus();
+      }
+      return;
+    }
+
+    if (query.length < 2) {
+      setSearchStatus("Scrivi almeno 2 caratteri per cercare.");
       return;
     }
 
@@ -712,12 +750,20 @@
 
     try {
       var results = await searchRadioBrowser(query);
+      if (requestId !== state.searchRequestId) {
+        return;
+      }
       renderSearchResults(results);
     } catch (error) {
+      if (requestId !== state.searchRequestId) {
+        return;
+      }
       clearElement(els.searchResults);
       setSearchStatus("Non riesco a raggiungere Radio Browser. Puoi comunque aggiungere una radio manualmente.");
     } finally {
-      els.searchButton.disabled = false;
+      if (requestId === state.searchRequestId) {
+        els.searchButton.disabled = false;
+      }
     }
   }
 
