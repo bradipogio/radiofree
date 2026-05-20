@@ -11,6 +11,8 @@
     "https://nl1.api.radio-browser.info/json/stations/search",
     "https://at1.api.radio-browser.info/json/stations/search"
   ];
+  var AUDIO_FADE_MS = 650;
+  var AUDIO_TARGET_VOLUME = 1;
 
   var state = {
     stations: [],
@@ -21,7 +23,11 @@
     messageTimer: null,
     searchTimer: null,
     searchRequestId: 0,
-    playbackStatus: "idle"
+    playbackStatus: "idle",
+    fadeTimer: null,
+    pauseIntent: "",
+    interruptedWhilePlaying: false,
+    resumeTimer: null
   };
 
   var els = {};
@@ -107,20 +113,29 @@
 
     els.playerToggleButton.addEventListener("click", handlePlayerToggle);
     els.stopButton.addEventListener("click", function () {
-      stopPlayer(true);
+      stopPlayer(true, { fade: true, intent: "stop" });
       showMessage("Riproduzione fermata.", "success");
     });
 
     els.audio.addEventListener("play", function () {
+      state.pauseIntent = "";
+      state.interruptedWhilePlaying = false;
       setPlaybackStatus("loading");
     });
     els.audio.addEventListener("playing", function () {
       setPlaybackStatus("playing");
+      fadeMediaVolume(AUDIO_TARGET_VOLUME, AUDIO_FADE_MS);
+      updateMediaSessionPlaybackState("playing");
     });
     els.audio.addEventListener("pause", function () {
       if (state.currentStation && state.playbackStatus !== "idle" && state.playbackStatus !== "error") {
+        if (!state.pauseIntent && (state.playbackStatus === "playing" || state.playbackStatus === "loading")) {
+          state.interruptedWhilePlaying = true;
+        }
         setPlaybackStatus("paused");
+        updateMediaSessionPlaybackState("paused");
       }
+      state.pauseIntent = "";
     });
     els.audio.addEventListener("waiting", function () {
       if (state.currentStation) {
@@ -140,9 +155,15 @@
     els.audio.addEventListener("error", function () {
       if (state.currentStation) {
         setPlaybackStatus("error");
+        updateMediaSessionPlaybackState("none");
         showPlayerError("Non riesco a riprodurre questa radio. Lo stream potrebbe non essere compatibile con il browser.");
       }
     });
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handlePossibleResume);
+    window.addEventListener("pageshow", handlePossibleResume);
+    window.addEventListener("online", handlePossibleResume);
   }
 
   function storageWorks() {
@@ -964,10 +985,15 @@
     }
 
     hidePlayerError();
+    state.pauseIntent = "";
+    state.interruptedWhilePlaying = false;
+    setMediaVolume(0);
+    updateMediaSessionMetadata();
     setPlaybackStatus("loading");
     var playPromise = els.audio.play();
     if (playPromise && typeof playPromise.catch === "function") {
       playPromise.catch(function () {
+        setMediaVolume(AUDIO_TARGET_VOLUME);
         setPlaybackStatus("paused");
         showPlayerError("L'audio non è partito. Tocca Play nel player o verifica che lo stream sia compatibile.");
       });
@@ -984,8 +1010,30 @@
       return;
     }
 
-    els.audio.pause();
-    setPlaybackStatus("paused");
+    pauseCurrentStation({ fade: true, intent: "user" });
+  }
+
+  function pauseCurrentStation(options) {
+    var opts = options || {};
+    state.pauseIntent = opts.intent || "user";
+    state.interruptedWhilePlaying = false;
+
+    var finishPause = function () {
+      try {
+        els.audio.pause();
+      } catch (error) {
+        // Ignora errori del player nativo.
+      }
+      setPlaybackStatus("paused");
+      updateMediaSessionPlaybackState("paused");
+      setMediaVolume(AUDIO_TARGET_VOLUME);
+    };
+
+    if (opts.fade) {
+      fadeMediaVolume(0, AUDIO_FADE_MS, finishPause);
+    } else {
+      finishPause();
+    }
   }
 
   function renderPlayer() {
@@ -1029,22 +1077,36 @@
     selectStation(matchingSavedStation || saved, false);
   }
 
-  function stopPlayer(clearCurrent) {
-    try {
-      els.audio.pause();
-    } catch (error) {
-      // Ignora errori del player nativo.
-    }
+  function stopPlayer(clearCurrent, options) {
+    var opts = options || {};
+    state.pauseIntent = opts.intent || "stop";
+    state.interruptedWhilePlaying = false;
 
-    els.audio.removeAttribute("src");
-    els.audio.dataset.streamUrl = "";
-    els.audio.load();
-    setPlaybackStatus("idle");
+    var finishStop = function () {
+      try {
+        els.audio.pause();
+      } catch (error) {
+        // Ignora errori del player nativo.
+      }
 
-    if (clearCurrent) {
-      state.currentStation = null;
-      saveCurrentStation(null);
-      renderPlayer();
+      els.audio.removeAttribute("src");
+      els.audio.dataset.streamUrl = "";
+      els.audio.load();
+      setMediaVolume(AUDIO_TARGET_VOLUME);
+      setPlaybackStatus("idle");
+      updateMediaSessionPlaybackState("none");
+
+      if (clearCurrent) {
+        state.currentStation = null;
+        saveCurrentStation(null);
+        renderPlayer();
+      }
+    };
+
+    if (opts.fade && !els.audio.paused) {
+      fadeMediaVolume(0, AUDIO_FADE_MS, finishStop);
+    } else {
+      finishStop();
     }
   }
 
@@ -1062,6 +1124,111 @@
   function setPlaybackStatus(status) {
     state.playbackStatus = status;
     updatePlayerButton();
+  }
+
+  function setMediaVolume(value) {
+    try {
+      els.audio.volume = Math.max(0, Math.min(AUDIO_TARGET_VOLUME, value));
+    } catch (error) {
+      // iOS puo' ignorare il controllo volume via JavaScript.
+    }
+  }
+
+  function fadeMediaVolume(target, duration, done) {
+    window.clearInterval(state.fadeTimer);
+
+    var start = typeof els.audio.volume === "number" ? els.audio.volume : AUDIO_TARGET_VOLUME;
+    var targetVolume = Math.max(0, Math.min(AUDIO_TARGET_VOLUME, target));
+    var startedAt = Date.now();
+
+    if (duration <= 0 || Math.abs(start - targetVolume) < 0.01) {
+      setMediaVolume(targetVolume);
+      if (typeof done === "function") {
+        done();
+      }
+      return;
+    }
+
+    state.fadeTimer = window.setInterval(function () {
+      var progress = Math.min(1, (Date.now() - startedAt) / duration);
+      var nextVolume = start + (targetVolume - start) * progress;
+      setMediaVolume(nextVolume);
+
+      if (progress >= 1) {
+        window.clearInterval(state.fadeTimer);
+        state.fadeTimer = null;
+        setMediaVolume(targetVolume);
+        if (typeof done === "function") {
+          done();
+        }
+      }
+    }, 40);
+  }
+
+  function handleVisibilityChange() {
+    // Non fermiamo l'audio quando l'app va in background: serve per Maps, blocco schermo e PWA.
+    if (!document.hidden) {
+      handlePossibleResume();
+    }
+  }
+
+  function handlePossibleResume() {
+    if (!state.currentStation || !state.interruptedWhilePlaying || !els.audio.paused) {
+      return;
+    }
+
+    window.clearTimeout(state.resumeTimer);
+    state.resumeTimer = window.setTimeout(function () {
+      if (state.interruptedWhilePlaying && state.currentStation && els.audio.paused) {
+        playCurrentStation();
+      }
+    }, 500);
+  }
+
+  function updateMediaSessionMetadata() {
+    if (!("mediaSession" in navigator) || !state.currentStation) {
+      return;
+    }
+
+    try {
+      if ("MediaMetadata" in window) {
+        var artwork = [];
+        if (state.currentStation.logoUrl) {
+          artwork.push({ src: state.currentStation.logoUrl });
+        }
+
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: state.currentStation.name,
+          artist: "Le mie radio",
+          album: "Web radio",
+          artwork: artwork
+        });
+      }
+
+      navigator.mediaSession.setActionHandler("play", function () {
+        playCurrentStation();
+      });
+      navigator.mediaSession.setActionHandler("pause", function () {
+        pauseCurrentStation({ fade: true, intent: "user" });
+      });
+      navigator.mediaSession.setActionHandler("stop", function () {
+        stopPlayer(true, { fade: true, intent: "stop" });
+      });
+    } catch (error) {
+      // Media Session non e' disponibile ovunque.
+    }
+  }
+
+  function updateMediaSessionPlaybackState(value) {
+    if (!("mediaSession" in navigator)) {
+      return;
+    }
+
+    try {
+      navigator.mediaSession.playbackState = value;
+    } catch (error) {
+      // Alcuni browser espongono solo parte della Media Session API.
+    }
   }
 
   function updatePlayerButton() {

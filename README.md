@@ -38,6 +38,14 @@ I percorsi sono relativi, quindi l'app è compatibile con la pubblicazione in so
 
 Da Home Screen l'app si apre in modalità standalone. L'audio parte solo dopo un tap, come richiesto da iOS.
 
+## Audio in background e interruzioni
+
+L'app non ferma l'audio quando passa in background, quindi una radio già avviata può continuare mentre usi altre app, per esempio Mappe.
+
+Il player usa i controlli multimediali del sistema dove disponibili e prova a gestire le interruzioni in modo morbido: fade in quando parte, fade out su pausa/stop, e ripresa automatica best-effort dopo pause non richieste dall'utente.
+
+Durante telefonate, Siri, notifiche vocali o altre interruzioni, iOS mantiene il controllo finale dell'audio. In alcuni casi potrebbe mettere in pausa lo stream e richiedere un nuovo tap su Play.
+
 ## Salvare radio
 
 Nella tab `Aggiungi` incolla l'URL diretto dello stream audio, inserisci un nome se vuoi, poi usa `Test Play` o `Salva radio`.
