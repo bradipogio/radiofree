@@ -11,6 +11,12 @@
     "https://nl1.api.radio-browser.info/json/stations/search",
     "https://at1.api.radio-browser.info/json/stations/search"
   ];
+  var RADIO_BROWSER_BASE_URLS = [
+    "https://de1.api.radio-browser.info",
+    "https://nl1.api.radio-browser.info",
+    "https://at1.api.radio-browser.info"
+  ];
+  var SEARCH_RESULT_LIMIT = 100;
   var AUDIO_FADE_MS = 650;
   var AUDIO_TARGET_VOLUME = 1;
 
@@ -27,7 +33,8 @@
     fadeTimer: null,
     pauseIntent: "",
     interruptedWhilePlaying: false,
-    resumeTimer: null
+    resumeTimer: null,
+    filtersLoaded: false
   };
 
   var els = {};
@@ -42,6 +49,7 @@
     renderStations();
     restoreCurrentStation();
     updateFormMode();
+    loadSearchFilters();
     registerServiceWorker();
 
     if (!state.storageAvailable) {
@@ -71,8 +79,14 @@
     els.addTitle = document.getElementById("add-title");
     els.addSubtitle = document.getElementById("add-subtitle");
 
+    els.settingsToggle = document.getElementById("settingsToggle");
+    els.settingsPanel = document.getElementById("settingsPanel");
+    els.settingsAddBtn = document.getElementById("settingsAddBtn");
+
     els.searchForm = document.getElementById("searchForm");
     els.searchQuery = document.getElementById("searchQuery");
+    els.searchCountry = document.getElementById("searchCountry");
+    els.searchTag = document.getElementById("searchTag");
     els.searchStatus = document.getElementById("searchStatus");
     els.searchResults = document.getElementById("searchResults");
 
@@ -103,11 +117,24 @@
     els.cancelEditBtn.addEventListener("click", cancelEdit);
     els.deleteEditBtn.addEventListener("click", handleDeleteFromEdit);
 
+    els.settingsToggle.addEventListener("click", toggleSettings);
+    els.settingsAddBtn.addEventListener("click", function () {
+      closeSettings();
+      setActiveTab("add");
+      els.stationStream.focus();
+    });
+
     els.searchForm.addEventListener("submit", handleSearchSubmit);
     els.searchQuery.addEventListener("input", handleSearchInput);
-    els.exportJsonBtn.addEventListener("click", exportStationsJson);
+    els.searchCountry.addEventListener("change", handleSearchInput);
+    els.searchTag.addEventListener("change", handleSearchInput);
+    els.exportJsonBtn.addEventListener("click", function () {
+      closeSettings();
+      exportStationsJson();
+    });
     els.importJsonBtn.addEventListener("click", function () {
       els.importFile.click();
+      closeSettings();
     });
     els.importFile.addEventListener("change", handleImportFile);
 
@@ -138,12 +165,12 @@
       state.pauseIntent = "";
     });
     els.audio.addEventListener("waiting", function () {
-      if (state.currentStation) {
+      if (state.currentStation && !els.audio.paused && !state.pauseIntent) {
         setPlaybackStatus("loading");
       }
     });
     els.audio.addEventListener("stalled", function () {
-      if (state.currentStation) {
+      if (state.currentStation && !els.audio.paused && !state.pauseIntent) {
         setPlaybackStatus("loading");
       }
     });
@@ -161,6 +188,7 @@
     });
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("click", handleDocumentClick);
     window.addEventListener("focus", handlePossibleResume);
     window.addEventListener("pageshow", handlePossibleResume);
     window.addEventListener("online", handlePossibleResume);
@@ -410,6 +438,7 @@
   }
 
   function setActiveTab(tabName) {
+    closeSettings();
     document.body.classList.toggle("search-active", tabName === "search");
 
     els.tabPanels.forEach(function (panel) {
@@ -433,6 +462,34 @@
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function toggleSettings(event) {
+    event.stopPropagation();
+    var willOpen = els.settingsPanel.hidden;
+    els.settingsPanel.hidden = !willOpen;
+    els.settingsToggle.setAttribute("aria-expanded", willOpen ? "true" : "false");
+  }
+
+  function closeSettings() {
+    if (!els.settingsPanel || els.settingsPanel.hidden) {
+      return;
+    }
+
+    els.settingsPanel.hidden = true;
+    els.settingsToggle.setAttribute("aria-expanded", "false");
+  }
+
+  function handleDocumentClick(event) {
+    if (!els.settingsPanel || els.settingsPanel.hidden) {
+      return;
+    }
+
+    if (event.target === els.settingsToggle || els.settingsPanel.contains(event.target)) {
+      return;
+    }
+
+    closeSettings();
+  }
+
   function renderStations() {
     clearElement(els.stationList);
 
@@ -449,23 +506,16 @@
   function renderEmptyState() {
     var card = createElement("div", "empty-card");
     var title = createElement("h2", "", "Non hai ancora radio salvate");
-    var text = createElement("p", "", "Vai su Aggiungi per incollare un URL oppure su Cerca per trovarne una.");
+    var text = createElement("p", "", "Usa l'ingranaggio per aggiungere una radio oppure vai su Cerca per trovarne una.");
     var actions = createElement("div", "empty-actions");
-    var addButton = createElement("button", "button button-primary", "Aggiungi radio");
     var searchButton = createElement("button", "button button-secondary", "Cerca radio");
 
-    addButton.type = "button";
     searchButton.type = "button";
-    addButton.addEventListener("click", function () {
-      setActiveTab("add");
-      els.stationStream.focus();
-    });
     searchButton.addEventListener("click", function () {
       setActiveTab("search");
       els.searchQuery.focus();
     });
 
-    actions.appendChild(addButton);
     actions.appendChild(searchButton);
     card.appendChild(title);
     card.appendChild(text);
@@ -759,21 +809,21 @@
   async function handleSearchSubmit(event) {
     event.preventDefault();
     window.clearTimeout(state.searchTimer);
-    performSearch(cleanText(els.searchQuery.value), true);
+    performSearch(readSearchCriteria(), true);
   }
 
   function handleSearchInput() {
-    var query = cleanText(els.searchQuery.value);
+    var criteria = readSearchCriteria();
     state.searchRequestId += 1;
 
-    if (!query) {
+    if (!hasSearchCriteria(criteria)) {
       window.clearTimeout(state.searchTimer);
       clearElement(els.searchResults);
       setSearchStatus("");
       return;
     }
 
-    if (query.length < 2) {
+    if (criteria.query && criteria.query.length < 2 && !criteria.country && !criteria.tag) {
       window.clearTimeout(state.searchTimer);
       clearElement(els.searchResults);
       setSearchStatus("Continua a scrivere per cercare.");
@@ -782,23 +832,23 @@
 
     window.clearTimeout(state.searchTimer);
     state.searchTimer = window.setTimeout(function () {
-      performSearch(query, false);
+      performSearch(criteria, false);
     }, 450);
   }
 
-  async function performSearch(query, focusIfEmpty) {
+  async function performSearch(criteria, focusIfEmpty) {
     var requestId = state.searchRequestId + 1;
     state.searchRequestId = requestId;
 
-    if (!query) {
-      setSearchStatus("Scrivi il nome di una radio o un genere da cercare.");
+    if (!hasSearchCriteria(criteria)) {
+      setSearchStatus("Scrivi un nome oppure scegli paese o genere.");
       if (focusIfEmpty) {
         els.searchQuery.focus();
       }
       return;
     }
 
-    if (query.length < 2) {
+    if (criteria.query && criteria.query.length < 2 && !criteria.country && !criteria.tag) {
       setSearchStatus("Scrivi almeno 2 caratteri per cercare.");
       return;
     }
@@ -807,7 +857,7 @@
     setSearchStatus("Cerco radio...");
 
     try {
-      var results = await searchRadioBrowser(query);
+      var results = await searchRadioBrowser(criteria);
       if (requestId !== state.searchRequestId) {
         return;
       }
@@ -821,15 +871,76 @@
     }
   }
 
-  async function searchRadioBrowser(query) {
+  function readSearchCriteria() {
+    return {
+      query: cleanText(els.searchQuery.value),
+      country: els.searchCountry ? cleanText(els.searchCountry.value) : "",
+      tag: els.searchTag ? cleanText(els.searchTag.value) : ""
+    };
+  }
+
+  function hasSearchCriteria(criteria) {
+    return Boolean(criteria && (criteria.query || criteria.country || criteria.tag));
+  }
+
+  async function searchRadioBrowser(criteria) {
+    var searches = buildStationSearches(criteria);
+    var collected = [];
+    var hadSuccess = false;
+    var lastError = null;
+
+    for (var i = 0; i < searches.length; i += 1) {
+      try {
+        collected = collected.concat(await fetchRadioBrowserStations(searches[i]));
+        hadSuccess = true;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    if (!hadSuccess) {
+      throw lastError || new Error("Radio Browser non raggiungibile");
+    }
+
+    return dedupeSearchResults(collected).slice(0, SEARCH_RESULT_LIMIT);
+  }
+
+  function buildStationSearches(criteria) {
+    var searches = [buildStationSearchParams(criteria, criteria.query ? "name" : "")];
+
+    if (criteria.query && !criteria.tag) {
+      searches.push(buildStationSearchParams({
+        query: "",
+        country: criteria.country,
+        tag: criteria.query
+      }, "tag"));
+    }
+
+    return searches;
+  }
+
+  function buildStationSearchParams(criteria, searchMode) {
     var params = new URLSearchParams({
-      name: query,
-      limit: "24",
+      limit: String(SEARCH_RESULT_LIMIT),
       hidebroken: "true",
       order: "clickcount",
       reverse: "true"
     });
 
+    if (criteria.query && searchMode !== "tag") {
+      params.set("name", criteria.query);
+    }
+    if (criteria.country) {
+      params.set("countrycode", criteria.country);
+    }
+    if (criteria.tag) {
+      params.set("tag", criteria.tag);
+    }
+
+    return params;
+  }
+
+  async function fetchRadioBrowserStations(params) {
     var lastError = null;
     for (var i = 0; i < RADIO_BROWSER_ENDPOINTS.length; i += 1) {
       try {
@@ -843,13 +954,167 @@
           throw new Error("Formato risposta non valido");
         }
 
-        return data.map(mapRadioBrowserResult).filter(Boolean);
+        return data;
       } catch (error) {
         lastError = error;
       }
     }
 
     throw lastError || new Error("Radio Browser non raggiungibile");
+  }
+
+  function dedupeSearchResults(items) {
+    var seen = {};
+
+    return items
+      .map(mapRadioBrowserResult)
+      .filter(Boolean)
+      .filter(function (station) {
+        var key = normalizeUrl(station.streamUrl).toLowerCase();
+        if (!key || seen[key]) {
+          return false;
+        }
+
+        seen[key] = true;
+        return true;
+      });
+  }
+
+  async function loadSearchFilters() {
+    if (!els.searchCountry || !els.searchTag) {
+      return;
+    }
+
+    populateFallbackFilters();
+
+    try {
+      var countries = await fetchRadioBrowserJson("/json/countries", {
+        order: "stationcount",
+        reverse: "true",
+        hidebroken: "true",
+        limit: "80"
+      });
+      populateCountryFilter(countries);
+    } catch (error) {
+      // I filtri base restano disponibili.
+    }
+
+    try {
+      var tags = await fetchRadioBrowserJson("/json/tags", {
+        order: "stationcount",
+        reverse: "true",
+        hidebroken: "true",
+        limit: "80"
+      });
+      populateTagFilter(tags);
+    } catch (error) {
+      // I filtri base restano disponibili.
+    }
+
+    state.filtersLoaded = true;
+  }
+
+  async function fetchRadioBrowserJson(path, params) {
+    var query = new URLSearchParams(params || {});
+    var lastError = null;
+
+    for (var i = 0; i < RADIO_BROWSER_BASE_URLS.length; i += 1) {
+      try {
+        var response = await fetchWithTimeout(RADIO_BROWSER_BASE_URLS[i] + path + "?" + query.toString(), 12000);
+        if (!response.ok) {
+          throw new Error("HTTP " + response.status);
+        }
+
+        var data = await response.json();
+        if (!Array.isArray(data)) {
+          throw new Error("Formato risposta non valido");
+        }
+
+        return data;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError || new Error("Radio Browser non raggiungibile");
+  }
+
+  function populateFallbackFilters() {
+    populateCountryFilter([
+      { name: "Italy", iso_3166_1: "IT" },
+      { name: "United Kingdom", iso_3166_1: "GB" },
+      { name: "United States", iso_3166_1: "US" },
+      { name: "France", iso_3166_1: "FR" },
+      { name: "Germany", iso_3166_1: "DE" },
+      { name: "Spain", iso_3166_1: "ES" },
+      { name: "Brazil", iso_3166_1: "BR" },
+      { name: "Argentina", iso_3166_1: "AR" }
+    ]);
+    populateTagFilter([
+      { name: "jazz" },
+      { name: "news" },
+      { name: "rock" },
+      { name: "classical" },
+      { name: "electronic" },
+      { name: "talk" },
+      { name: "ambient" },
+      { name: "pop" }
+    ]);
+  }
+
+  function populateCountryFilter(countries) {
+    var currentValue = els.searchCountry.value;
+    resetSelect(els.searchCountry, "Tutti i paesi");
+
+    countries
+      .map(function (country) {
+        return {
+          label: cleanText(country.name),
+          value: cleanText(country.iso_3166_1 || country.countrycode)
+        };
+      })
+      .filter(function (country) {
+        return country.label && country.value;
+      })
+      .forEach(function (country) {
+        var option = document.createElement("option");
+        option.value = country.value;
+        option.textContent = country.label;
+        els.searchCountry.appendChild(option);
+      });
+
+    if (currentValue) {
+      els.searchCountry.value = currentValue;
+    }
+  }
+
+  function populateTagFilter(tags) {
+    var currentValue = els.searchTag.value;
+    resetSelect(els.searchTag, "Tutti i generi");
+
+    tags
+      .map(function (tag) {
+        return cleanText(tag.name);
+      })
+      .filter(Boolean)
+      .forEach(function (tag) {
+        var option = document.createElement("option");
+        option.value = tag;
+        option.textContent = titleCase(tag);
+        els.searchTag.appendChild(option);
+      });
+
+    if (currentValue) {
+      els.searchTag.value = currentValue;
+    }
+  }
+
+  function resetSelect(select, label) {
+    clearElement(select);
+    var option = document.createElement("option");
+    option.value = "";
+    option.textContent = label;
+    select.appendChild(option);
   }
 
   function fetchWithTimeout(url, timeout) {
@@ -884,18 +1149,37 @@
     if (!isValidHttpUrl(streamUrl)) {
       return null;
     }
+    var logoUrl = chooseLogoUrl(item.favicon, item.homepage);
 
     return {
       id: item.stationuuid ? "radio-browser-" + item.stationuuid : createStationId(),
       name: cleanText(item.name) || generateNameFromUrl(streamUrl),
       streamUrl: streamUrl,
-      logoUrl: isValidHttpUrl(item.favicon) ? normalizeUrl(item.favicon) : "",
+      logoUrl: logoUrl,
       notes: "",
       createdAt: new Date().toISOString(),
       country: cleanText(item.country),
       codec: cleanText(item.codec),
       bitrate: Number(item.bitrate) > 0 ? Number(item.bitrate) : ""
     };
+  }
+
+  function chooseLogoUrl(favicon, homepage) {
+    var directIcon = normalizeUrl(favicon);
+    if (isValidHttpUrl(directIcon)) {
+      return directIcon;
+    }
+
+    var home = normalizeUrl(homepage);
+    if (!isValidHttpUrl(home)) {
+      return "";
+    }
+
+    try {
+      return new URL("/favicon.ico", home).href;
+    } catch (error) {
+      return "";
+    }
   }
 
   function renderSearchResults(results) {

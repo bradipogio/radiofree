@@ -48,7 +48,7 @@ Durante telefonate, Siri, notifiche vocali o altre interruzioni, iOS mantiene il
 
 ## Salvare radio
 
-Nella tab `Aggiungi` incolla l'URL diretto dello stream audio, inserisci un nome se vuoi, poi usa `Test Play` o `Salva radio`.
+Dal pulsante impostazioni in alto a destra scegli `Aggiungi`, incolla l'URL diretto dello stream audio, inserisci un nome se vuoi, poi usa `Test Play` o `Salva radio`.
 
 Se lasci vuoto il nome, l'app prova a generarlo dall'URL. Se una radio con lo stesso URL è già salvata, l'app evita il duplicato.
 
@@ -64,7 +64,9 @@ Alcune radio non funzionano se lo stream non è compatibile con il browser, se r
 
 La tab `Cerca` usa la Radio Browser API pubblica per trovare radio online. Non richiede API key.
 
-La ricerca è opzionale: se Radio Browser non risponde o la rete non è disponibile, puoi comunque aggiungere radio manualmente dalla tab `Aggiungi`.
+La ricerca è opzionale: se Radio Browser non risponde o la rete non è disponibile, puoi comunque aggiungere radio manualmente dal pulsante impostazioni.
+
+I risultati arrivano da Radio Browser, un database pubblico e collaborativo di web radio. La ricerca usa nome, paese e genere/tag; quando scrivi testo senza scegliere un genere, l'app prova sia per nome sia per tag e mostra fino a 100 risultati validi. Se Radio Browser non fornisce un logo, l'app prova anche il favicon della homepage.
 
 ## Import/export
 
