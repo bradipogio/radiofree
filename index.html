@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#f4f7fb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Radio">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>Le mie radio</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="icon" href="icons/icon-192.png" sizes="192x192">
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <div id="message" class="message" role="status" aria-live="polite" hidden></div>
+
+      <main class="app-main">
+        <section id="tab-radio" class="tab-panel" data-tab-panel="radio" aria-labelledby="radio-title">
+          <header class="screen-header">
+            <h1 id="radio-title">Le mie radio</h1>
+            <p>Scegli una radio salvata</p>
+          </header>
+
+          <div id="stationList" class="station-list" aria-live="polite"></div>
+
+          <section class="backup-panel" aria-labelledby="backup-title">
+            <div class="section-heading">
+              <h2 id="backup-title">Backup lista radio</h2>
+              <p>Esporta la tua lista o importala su un altro telefono.</p>
+            </div>
+
+            <div class="backup-block">
+              <button id="exportJsonBtn" class="button button-secondary" type="button">Esporta JSON</button>
+            </div>
+
+            <div class="backup-block">
+              <label for="importFile">Importa da file</label>
+              <input id="importFile" type="file" accept="application/json,.json">
+            </div>
+
+            <div class="backup-block">
+              <label for="importText">Importa da testo</label>
+              <textarea id="importText" rows="6" placeholder="Incolla qui il JSON esportato"></textarea>
+              <button id="importTextBtn" class="button button-secondary" type="button">Importa da testo</button>
+            </div>
+
+            <div class="danger-zone">
+              <h3>Zona pericolosa</h3>
+              <button id="resetDataBtn" class="button button-danger" type="button">Reset dati locali</button>
+            </div>
+          </section>
+        </section>
+
+        <section id="tab-add" class="tab-panel" data-tab-panel="add" aria-labelledby="add-title" hidden>
+          <header class="screen-header">
+            <h1 id="add-title">Aggiungi radio</h1>
+            <p id="add-subtitle">Incolla l'URL dello stream e salva la radio</p>
+          </header>
+
+          <form id="stationForm" class="card form-card" novalidate>
+            <div class="field">
+              <label for="stationName">Nome radio</label>
+              <input id="stationName" name="name" type="text" autocomplete="off" placeholder="Es. Latina Stereo">
+            </div>
+
+            <div class="field field-primary">
+              <label for="stationStream">URL stream</label>
+              <input id="stationStream" name="streamUrl" type="url" inputmode="url" autocomplete="url" required placeholder="https://example.com/stream.mp3" aria-describedby="stream-help">
+              <p id="stream-help" class="field-help">Incolla qui l'URL diretto dello stream audio, non necessariamente la homepage della radio.</p>
+            </div>
+
+            <div class="field">
+              <label for="stationLogo">URL logo opzionale</label>
+              <input id="stationLogo" name="logoUrl" type="url" inputmode="url" autocomplete="url" placeholder="https://example.com/logo.png">
+            </div>
+
+            <div class="field">
+              <label for="stationNotes">Note opzionali</label>
+              <textarea id="stationNotes" name="notes" rows="4" placeholder="Es. programma preferito, genere, sito ufficiale"></textarea>
+            </div>
+
+            <div id="formError" class="inline-error" role="alert" hidden></div>
+
+            <div class="form-actions">
+              <button id="testPlayBtn" class="button button-secondary" type="button">Test Play</button>
+              <button id="saveStationBtn" class="button button-primary" type="submit">Salva radio</button>
+              <button id="clearFormBtn" class="button button-ghost" type="button">Cancella campi</button>
+              <button id="cancelEditBtn" class="button button-ghost" type="button" hidden>Annulla modifica</button>
+            </div>
+          </form>
+        </section>
+
+        <section id="tab-search" class="tab-panel" data-tab-panel="search" aria-labelledby="search-title" hidden>
+          <header class="screen-header">
+            <h1 id="search-title">Cerca radio</h1>
+            <p>Trova una radio online e salvala</p>
+          </header>
+
+          <form id="searchForm" class="card search-card" role="search">
+            <div class="field">
+              <label for="searchQuery">Cerca radio online</label>
+              <input id="searchQuery" type="search" placeholder="Cerca per nome, es. jazz, BBC, RAI..." autocomplete="off">
+            </div>
+            <button id="searchButton" class="button button-primary" type="submit">Cerca</button>
+          </form>
+
+          <div id="searchStatus" class="search-status" role="status" aria-live="polite"></div>
+          <div id="searchResults" class="station-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <section class="player-bar" aria-label="Player audio">
+      <div id="playerLogo" class="station-logo station-logo-small" aria-hidden="true">
+        <span>-</span>
+      </div>
+      <div class="player-body">
+        <p class="player-label">Ora in riproduzione</p>
+        <p id="playerTitle" class="player-title">Nessuna radio selezionata</p>
+        <audio id="audioPlayer" controls preload="none"></audio>
+        <p id="playerError" class="player-error" role="alert" hidden></p>
+      </div>
+      <button id="stopButton" class="button button-stop" type="button" hidden>Stop</button>
+    </section>
+
+    <nav class="tabbar" aria-label="Sezioni principali">
+      <button class="tab-button is-active" type="button" data-tab="radio" aria-current="page">Radio</button>
+      <button class="tab-button" type="button" data-tab="add">Aggiungi</button>
+      <button class="tab-button" type="button" data-tab="search">Cerca</button>
+    </nav>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
