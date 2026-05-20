@@ -58,6 +58,7 @@
     els.saveStationBtn = document.getElementById("saveStationBtn");
     els.clearFormBtn = document.getElementById("clearFormBtn");
     els.cancelEditBtn = document.getElementById("cancelEditBtn");
+    els.deleteEditBtn = document.getElementById("deleteEditBtn");
     els.addTitle = document.getElementById("add-title");
     els.addSubtitle = document.getElementById("add-subtitle");
 
@@ -92,6 +93,7 @@
     els.testPlayBtn.addEventListener("click", handleTestPlay);
     els.clearFormBtn.addEventListener("click", clearFormFields);
     els.cancelEditBtn.addEventListener("click", cancelEdit);
+    els.deleteEditBtn.addEventListener("click", handleDeleteFromEdit);
 
     els.searchForm.addEventListener("submit", handleSearchSubmit);
     els.exportJsonBtn.addEventListener("click", exportStationsJson);
@@ -417,6 +419,10 @@
   }
 
   function createStationCard(station, source) {
+    if (source === "saved") {
+      return createSavedStationCard(station);
+    }
+
     var card = createElement("article", "station-card");
     var logo = createLogo(station.name, station.logoUrl, "station-logo");
     var main = createElement("div", "station-main");
@@ -438,37 +444,48 @@
       main.appendChild(createElement("p", "station-notes", station.notes));
     }
 
-    if (source === "saved") {
-      main.appendChild(createElement("p", "station-date", "Aggiunta il " + formatDate(station.createdAt)));
-      main.appendChild(createDetails("URL stream", station.streamUrl));
-    }
-
     actions.appendChild(playButton);
 
-    if (source === "saved") {
-      var editButton = createElement("button", "button button-secondary", "Modifica");
-      var deleteButton = createElement("button", "button button-danger", "Elimina");
-      editButton.type = "button";
-      deleteButton.type = "button";
-      editButton.addEventListener("click", function () {
-        startEdit(station.id);
-      });
-      deleteButton.addEventListener("click", function () {
-        confirmDelete(station);
-      });
-      actions.appendChild(editButton);
-      actions.appendChild(deleteButton);
-    } else {
-      var saveButton = createElement("button", "button button-secondary", "Salva");
-      saveButton.type = "button";
-      saveButton.addEventListener("click", function () {
-        saveSearchResult(station);
-      });
-      actions.appendChild(saveButton);
-    }
+    var saveButton = createElement("button", "button button-secondary", "Salva");
+    saveButton.type = "button";
+    saveButton.addEventListener("click", function () {
+      saveSearchResult(station);
+    });
+    actions.appendChild(saveButton);
 
     main.appendChild(actions);
     card.appendChild(main);
+    return card;
+  }
+
+  function createSavedStationCard(station) {
+    var card = createElement("article", "station-card saved-station-card");
+    var title = createElement("h2", "station-title", station.name || "Radio senza nome");
+    var actions = createElement("div", "station-actions");
+    var playButton = createElement("button", "button button-primary", "Play");
+    var editButton = createElement("button", "button icon-button", "");
+    var editIcon = createElement("span", "", "✎");
+    var editLabel = createElement("span", "visually-hidden", "Modifica o elimina " + (station.name || "questa radio"));
+
+    playButton.type = "button";
+    playButton.addEventListener("click", function () {
+      playStation(station);
+    });
+
+    editButton.type = "button";
+    editButton.title = "Modifica o elimina";
+    editButton.setAttribute("aria-label", "Modifica o elimina " + (station.name || "questa radio"));
+    editButton.addEventListener("click", function () {
+      startEdit(station.id);
+    });
+
+    editIcon.setAttribute("aria-hidden", "true");
+    editButton.appendChild(editIcon);
+    editButton.appendChild(editLabel);
+    actions.appendChild(playButton);
+    actions.appendChild(editButton);
+    card.appendChild(title);
+    card.appendChild(actions);
     return card;
   }
 
@@ -645,16 +662,38 @@
     els.addSubtitle.textContent = editing ? "Aggiorna i dati della radio salvata" : "Incolla l'URL dello stream e salva la radio";
     els.saveStationBtn.textContent = editing ? "Salva modifiche" : "Salva radio";
     els.cancelEditBtn.hidden = !editing;
+    els.deleteEditBtn.hidden = !editing;
+  }
+
+  function handleDeleteFromEdit() {
+    if (!state.editingId) {
+      return;
+    }
+
+    var station = state.stations.find(function (item) {
+      return item.id === state.editingId;
+    });
+
+    if (!station) {
+      showMessage("Radio non trovata.", "error");
+      return;
+    }
+
+    if (confirmDelete(station)) {
+      cancelEdit();
+      setActiveTab("radio");
+    }
   }
 
   function confirmDelete(station) {
     var ok = window.confirm('Eliminare "' + station.name + '" dalla lista?');
     if (!ok) {
-      return;
+      return false;
     }
 
     deleteStation(station.id);
     showMessage("Radio eliminata.", "success");
+    return true;
   }
 
   async function handleSearchSubmit(event) {
