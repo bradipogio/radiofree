@@ -64,9 +64,9 @@ Le radio sono salvate localmente nel singolo browser. Una lista salvata su iPhon
 
 Per trasferire i dati:
 
-- usa `Esporta JSON` per scaricare `mie-radio.json`;
+- usa `Backup` per scaricare `mie-radio.json`;
 - invia il file via AirDrop, iCloud Drive, email, WhatsApp, Telegram, Note o un altro sistema;
-- sull'altro dispositivo usa `Importa da file` oppure incolla il contenuto JSON in `Importa da testo`.
+- sull'altro dispositivo usa `Importa` e scegli il file JSON.
 
 L'import unisce le radio alla lista esistente. Le radio duplicate, riconosciute dallo stesso `streamUrl`, vengono saltate. Le radio non valide vengono ignorate.
 
@@ -90,12 +90,6 @@ Formato esportato:
 ```
 
 L'import accetta anche un semplice array JSON di radio.
-
-## Reset dati locali
-
-In fondo alla tab `Radio` trovi `Reset dati locali`.
-
-Il reset cancella le radio salvate e l'ultima radio selezionata solo dal browser corrente. Non cancella file JSON esportati in precedenza.
 
 ## Pubblicità negli stream
 

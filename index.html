@@ -11,7 +11,7 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" href="icons/icon-192.png" sizes="192x192">
-    <link rel="stylesheet" href="style.css?v=20260520-3">
+    <link rel="stylesheet" href="style.css?v=20260520-4">
   </head>
   <body>
     <div class="app-shell">
@@ -26,30 +26,12 @@
 
           <div id="stationList" class="station-list" aria-live="polite"></div>
 
-          <section class="backup-panel" aria-labelledby="backup-title">
-            <div class="section-heading">
-              <h2 id="backup-title">Backup lista radio</h2>
-              <p>Esporta la tua lista o importala su un altro telefono.</p>
-            </div>
-
-            <div class="backup-block">
-              <button id="exportJsonBtn" class="button button-secondary" type="button">Esporta JSON</button>
-            </div>
-
-            <div class="backup-block">
-              <label for="importFile">Importa da file</label>
-              <input id="importFile" type="file" accept="application/json,.json">
-            </div>
-
-            <div class="backup-block">
-              <label for="importText">Importa da testo</label>
-              <textarea id="importText" rows="6" placeholder="Incolla qui il JSON esportato"></textarea>
-              <button id="importTextBtn" class="button button-secondary" type="button">Importa da testo</button>
-            </div>
-
-            <div class="danger-zone">
-              <h3>Zona pericolosa</h3>
-              <button id="resetDataBtn" class="button button-danger" type="button">Reset dati locali</button>
+          <section class="backup-panel compact-backup" aria-labelledby="backup-title">
+            <h2 id="backup-title">Lista radio</h2>
+            <div class="backup-actions">
+              <button id="exportJsonBtn" class="button button-ghost" type="button">Backup</button>
+              <button id="importJsonBtn" class="button button-ghost" type="button">Importa</button>
+              <input id="importFile" class="hidden-file-input" type="file" accept="application/json,.json" aria-label="Importa file JSON">
             </div>
           </section>
         </section>
@@ -105,7 +87,6 @@
               <label for="searchQuery">Cerca radio online</label>
               <input id="searchQuery" type="search" placeholder="Cerca per nome, es. jazz, BBC, RAI..." autocomplete="off">
             </div>
-            <button id="searchButton" class="button button-primary" type="submit">Cerca</button>
           </form>
 
           <div id="searchStatus" class="search-status" role="status" aria-live="polite"></div>
@@ -119,12 +100,14 @@
         <span>-</span>
       </div>
       <div class="player-body">
-        <p class="player-label">Ora in riproduzione</p>
         <p id="playerTitle" class="player-title">Nessuna radio selezionata</p>
-        <audio id="audioPlayer" controls preload="none"></audio>
         <p id="playerError" class="player-error" role="alert" hidden></p>
       </div>
+      <button id="playerToggleButton" class="button player-toggle-button" type="button" aria-label="Play" disabled>
+        <span id="playerToggleIcon" aria-hidden="true">▶</span>
+      </button>
       <button id="stopButton" class="button button-stop" type="button" hidden>Stop</button>
+      <audio id="audioPlayer" preload="none"></audio>
     </section>
 
     <nav class="tabbar" aria-label="Sezioni principali">
@@ -133,6 +116,6 @@
       <button class="tab-button" type="button" data-tab="search">Cerca</button>
     </nav>
 
-    <script src="app.js?v=20260520-3" defer></script>
+    <script src="app.js?v=20260520-4" defer></script>
   </body>
 </html>

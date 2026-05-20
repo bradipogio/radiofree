@@ -20,7 +20,8 @@
     storageCorrupted: false,
     messageTimer: null,
     searchTimer: null,
-    searchRequestId: 0
+    searchRequestId: 0,
+    playbackStatus: "idle"
   };
 
   var els = {};
@@ -40,7 +41,7 @@
     if (!state.storageAvailable) {
       showMessage("Il browser non permette il salvataggio locale. Puoi usare l'app, ma i dati potrebbero sparire alla chiusura.", "warning", true);
     } else if (state.storageCorrupted) {
-      showMessage("I dati salvati nel browser non sono leggibili. Puoi usare Reset dati locali per ripartire.", "warning", true);
+      showMessage("I dati salvati nel browser non sono leggibili. Puoi importare un backup o cancellare i dati del sito dal browser.", "warning", true);
     }
   }
 
@@ -66,21 +67,20 @@
 
     els.searchForm = document.getElementById("searchForm");
     els.searchQuery = document.getElementById("searchQuery");
-    els.searchButton = document.getElementById("searchButton");
     els.searchStatus = document.getElementById("searchStatus");
     els.searchResults = document.getElementById("searchResults");
 
     els.exportJsonBtn = document.getElementById("exportJsonBtn");
+    els.importJsonBtn = document.getElementById("importJsonBtn");
     els.importFile = document.getElementById("importFile");
-    els.importText = document.getElementById("importText");
-    els.importTextBtn = document.getElementById("importTextBtn");
-    els.resetDataBtn = document.getElementById("resetDataBtn");
 
     els.playerBar = document.querySelector(".player-bar");
     els.playerLogo = document.getElementById("playerLogo");
     els.playerTitle = document.getElementById("playerTitle");
     els.audio = document.getElementById("audioPlayer");
     els.playerError = document.getElementById("playerError");
+    els.playerToggleButton = document.getElementById("playerToggleButton");
+    els.playerToggleIcon = document.getElementById("playerToggleIcon");
     els.stopButton = document.getElementById("stopButton");
   }
 
@@ -100,17 +100,46 @@
     els.searchForm.addEventListener("submit", handleSearchSubmit);
     els.searchQuery.addEventListener("input", handleSearchInput);
     els.exportJsonBtn.addEventListener("click", exportStationsJson);
+    els.importJsonBtn.addEventListener("click", function () {
+      els.importFile.click();
+    });
     els.importFile.addEventListener("change", handleImportFile);
-    els.importTextBtn.addEventListener("click", handleImportText);
-    els.resetDataBtn.addEventListener("click", resetLocalData);
 
+    els.playerToggleButton.addEventListener("click", handlePlayerToggle);
     els.stopButton.addEventListener("click", function () {
       stopPlayer(true);
       showMessage("Riproduzione fermata.", "success");
     });
 
+    els.audio.addEventListener("play", function () {
+      setPlaybackStatus("loading");
+    });
+    els.audio.addEventListener("playing", function () {
+      setPlaybackStatus("playing");
+    });
+    els.audio.addEventListener("pause", function () {
+      if (state.currentStation && state.playbackStatus !== "idle" && state.playbackStatus !== "error") {
+        setPlaybackStatus("paused");
+      }
+    });
+    els.audio.addEventListener("waiting", function () {
+      if (state.currentStation) {
+        setPlaybackStatus("loading");
+      }
+    });
+    els.audio.addEventListener("stalled", function () {
+      if (state.currentStation) {
+        setPlaybackStatus("loading");
+      }
+    });
+    els.audio.addEventListener("canplay", function () {
+      if (state.currentStation && state.playbackStatus === "loading" && els.audio.paused) {
+        setPlaybackStatus("ready");
+      }
+    });
     els.audio.addEventListener("error", function () {
       if (state.currentStation) {
+        setPlaybackStatus("error");
         showPlayerError("Non riesco a riprodurre questa radio. Lo stream potrebbe non essere compatibile con il browser.");
       }
     });
@@ -360,6 +389,8 @@
   }
 
   function setActiveTab(tabName) {
+    document.body.classList.toggle("search-active", tabName === "search");
+
     els.tabPanels.forEach(function (panel) {
       panel.hidden = panel.dataset.tabPanel !== tabName;
     });
@@ -718,7 +749,6 @@
       window.clearTimeout(state.searchTimer);
       clearElement(els.searchResults);
       setSearchStatus("");
-      els.searchButton.disabled = false;
       return;
     }
 
@@ -726,7 +756,6 @@
       window.clearTimeout(state.searchTimer);
       clearElement(els.searchResults);
       setSearchStatus("Continua a scrivere per cercare.");
-      els.searchButton.disabled = false;
       return;
     }
 
@@ -755,7 +784,6 @@
 
     clearElement(els.searchResults);
     setSearchStatus("Cerco radio...");
-    els.searchButton.disabled = true;
 
     try {
       var results = await searchRadioBrowser(query);
@@ -769,10 +797,6 @@
       }
       clearElement(els.searchResults);
       setSearchStatus("Non riesco a raggiungere Radio Browser. Puoi comunque aggiungere una radio manualmente.");
-    } finally {
-      if (requestId === state.searchRequestId) {
-        els.searchButton.disabled = false;
-      }
     }
   }
 
@@ -900,11 +924,12 @@
     }
 
     var same = state.currentStation && sameStationOrUrl(state.currentStation, sanitized);
-    selectStation(sanitized, true);
-
     if (same && !els.audio.paused) {
       highlightPlayer();
+      return;
     }
+
+    selectStation(sanitized, true);
   }
 
   function selectStation(station, shouldPlay) {
@@ -916,19 +941,51 @@
     if (els.audio.dataset.streamUrl !== streamUrl) {
       els.audio.src = streamUrl;
       els.audio.dataset.streamUrl = streamUrl;
-      els.audio.load();
     }
 
     if (shouldPlay) {
-      var playPromise = els.audio.play();
-      if (playPromise && typeof playPromise.catch === "function") {
-        playPromise.catch(function () {
-          showPlayerError("L'audio non è partito. Tocca Play nel player o verifica che lo stream sia compatibile.");
-        });
-      }
+      playCurrentStation();
+    } else {
+      setPlaybackStatus("ready");
     }
 
     highlightPlayer();
+  }
+
+  function playCurrentStation() {
+    if (!state.currentStation) {
+      showMessage("Scegli prima una radio.", "warning");
+      return;
+    }
+
+    if (!els.audio.src && state.currentStation.streamUrl) {
+      els.audio.src = normalizeUrl(state.currentStation.streamUrl);
+      els.audio.dataset.streamUrl = normalizeUrl(state.currentStation.streamUrl);
+    }
+
+    hidePlayerError();
+    setPlaybackStatus("loading");
+    var playPromise = els.audio.play();
+    if (playPromise && typeof playPromise.catch === "function") {
+      playPromise.catch(function () {
+        setPlaybackStatus("paused");
+        showPlayerError("L'audio non è partito. Tocca Play nel player o verifica che lo stream sia compatibile.");
+      });
+    }
+  }
+
+  function handlePlayerToggle() {
+    if (!state.currentStation || state.playbackStatus === "loading") {
+      return;
+    }
+
+    if (els.audio.paused) {
+      playCurrentStation();
+      return;
+    }
+
+    els.audio.pause();
+    setPlaybackStatus("paused");
   }
 
   function renderPlayer() {
@@ -936,20 +993,26 @@
     hidePlayerError();
 
     if (!state.currentStation) {
+      document.body.classList.remove("has-player");
       els.playerLogo.appendChild(createElement("span", "", "-"));
       els.playerTitle.textContent = "Nessuna radio selezionata";
       els.audio.hidden = true;
+      els.playerToggleButton.disabled = true;
       els.stopButton.hidden = true;
+      setPlaybackStatus("idle");
       return;
     }
 
+    document.body.classList.add("has-player");
     var logo = createLogo(state.currentStation.name, state.currentStation.logoUrl, "station-logo station-logo-small");
     while (logo.firstChild) {
       els.playerLogo.appendChild(logo.firstChild);
     }
     els.playerTitle.textContent = state.currentStation.name;
     els.audio.hidden = false;
+    els.playerToggleButton.disabled = false;
     els.stopButton.hidden = false;
+    updatePlayerButton();
   }
 
   function restoreCurrentStation() {
@@ -976,6 +1039,7 @@
     els.audio.removeAttribute("src");
     els.audio.dataset.streamUrl = "";
     els.audio.load();
+    setPlaybackStatus("idle");
 
     if (clearCurrent) {
       state.currentStation = null;
@@ -993,6 +1057,40 @@
   function hidePlayerError() {
     els.playerError.textContent = "";
     els.playerError.hidden = true;
+  }
+
+  function setPlaybackStatus(status) {
+    state.playbackStatus = status;
+    updatePlayerButton();
+  }
+
+  function updatePlayerButton() {
+    if (!els.playerToggleButton || !els.playerToggleIcon) {
+      return;
+    }
+
+    els.playerToggleButton.classList.toggle("is-loading", state.playbackStatus === "loading");
+
+    if (!state.currentStation) {
+      els.playerToggleIcon.textContent = "▶";
+      els.playerToggleButton.setAttribute("aria-label", "Play");
+      return;
+    }
+
+    if (state.playbackStatus === "loading") {
+      els.playerToggleIcon.textContent = "";
+      els.playerToggleButton.setAttribute("aria-label", "Caricamento " + state.currentStation.name);
+      return;
+    }
+
+    if (!els.audio.paused && state.playbackStatus === "playing") {
+      els.playerToggleIcon.textContent = "Ⅱ";
+      els.playerToggleButton.setAttribute("aria-label", "Pausa " + state.currentStation.name);
+      return;
+    }
+
+    els.playerToggleIcon.textContent = "▶";
+    els.playerToggleButton.setAttribute("aria-label", "Play " + state.currentStation.name);
   }
 
   function highlightPlayer() {
@@ -1051,10 +1149,6 @@
       els.importFile.value = "";
     };
     reader.readAsText(file);
-  }
-
-  function handleImportText() {
-    importStationsFromText(els.importText.value);
   }
 
   function importStationsFromText(text) {
