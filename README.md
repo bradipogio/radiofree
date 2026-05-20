@@ -52,6 +52,8 @@ Dal pulsante impostazioni in alto a destra scegli `Aggiungi`, incolla l'URL dire
 
 Se lasci vuoto il nome, l'app prova a generarlo dall'URL. Se una radio con lo stesso URL è già salvata, l'app evita il duplicato.
 
+Nella lista principale le radio che avvii più spesso salgono automaticamente in alto. Il conteggio resta salvato solo nel browser.
+
 ## Homepage e URL stream
 
 La homepage della radio è una pagina web visitabile, per esempio `https://nomeradio.example`.
@@ -66,7 +68,7 @@ La tab `Cerca` usa la Radio Browser API pubblica per trovare radio online. Non r
 
 La ricerca è opzionale: se Radio Browser non risponde o la rete non è disponibile, puoi comunque aggiungere radio manualmente dal pulsante impostazioni.
 
-I risultati arrivano da Radio Browser, un database pubblico e collaborativo di web radio. La ricerca usa nome, paese e genere/tag; quando scrivi testo senza scegliere un genere, l'app prova sia per nome sia per tag e mostra fino a 100 risultati validi. Se Radio Browser non fornisce un logo, l'app prova anche il favicon della homepage.
+I risultati arrivano da Radio Browser, un database pubblico e collaborativo di web radio. La ricerca usa nome, paese e genere/tag; quando scrivi testo senza scegliere un genere, l'app prova sia per nome sia per tag e mostra fino a 100 risultati validi. I menu di paese e genere sono ordinati alfabeticamente e si restringono a vicenda in base alle stazioni trovate. Se Radio Browser non fornisce un logo, l'app prova anche il favicon della homepage.
 
 ## Import/export
 

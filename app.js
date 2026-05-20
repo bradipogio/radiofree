@@ -16,7 +16,18 @@
     "https://nl1.api.radio-browser.info",
     "https://at1.api.radio-browser.info"
   ];
+  var GENRE_TAGS = [
+    "00s", "60s", "70s", "80s", "90s",
+    "acoustic", "adult contemporary", "alternative", "ambient", "blues",
+    "chillout", "christian", "classical", "country", "dance", "disco",
+    "easy listening", "electronic", "folk", "funk", "gospel", "hip hop",
+    "hits", "house", "indie", "jazz", "latin", "lounge", "metal", "news",
+    "oldies", "opera", "pop", "punk", "r&b", "rap", "reggae", "rock",
+    "salsa", "smooth jazz", "soul", "soundtrack", "talk", "techno",
+    "trance", "world"
+  ];
   var SEARCH_RESULT_LIMIT = 100;
+  var FILTER_SAMPLE_LIMIT = 500;
   var AUDIO_FADE_MS = 650;
   var AUDIO_TARGET_VOLUME = 1;
 
@@ -29,12 +40,16 @@
     messageTimer: null,
     searchTimer: null,
     searchRequestId: 0,
+    filterRequestId: 0,
+    playRequestId: 0,
     playbackStatus: "idle",
     fadeTimer: null,
     pauseIntent: "",
     interruptedWhilePlaying: false,
     resumeTimer: null,
-    filtersLoaded: false
+    filtersLoaded: false,
+    allCountries: [],
+    allTags: []
   };
 
   var els = {};
@@ -101,7 +116,6 @@
     els.playerError = document.getElementById("playerError");
     els.playerToggleButton = document.getElementById("playerToggleButton");
     els.playerToggleIcon = document.getElementById("playerToggleIcon");
-    els.stopButton = document.getElementById("stopButton");
   }
 
   function bindEvents() {
@@ -126,8 +140,12 @@
 
     els.searchForm.addEventListener("submit", handleSearchSubmit);
     els.searchQuery.addEventListener("input", handleSearchInput);
-    els.searchCountry.addEventListener("change", handleSearchInput);
-    els.searchTag.addEventListener("change", handleSearchInput);
+    els.searchCountry.addEventListener("change", function () {
+      handleFilterChange("country");
+    });
+    els.searchTag.addEventListener("change", function () {
+      handleFilterChange("tag");
+    });
     els.exportJsonBtn.addEventListener("click", function () {
       closeSettings();
       exportStationsJson();
@@ -139,11 +157,6 @@
     els.importFile.addEventListener("change", handleImportFile);
 
     els.playerToggleButton.addEventListener("click", handlePlayerToggle);
-    els.stopButton.addEventListener("click", function () {
-      stopPlayer(true, { fade: true, intent: "stop" });
-      showMessage("Riproduzione fermata.", "success");
-    });
-
     els.audio.addEventListener("play", function () {
       state.pauseIntent = "";
       state.interruptedWhilePlaying = false;
@@ -155,6 +168,11 @@
       updateMediaSessionPlaybackState("playing");
     });
     els.audio.addEventListener("pause", function () {
+      if (state.pauseIntent === "stop") {
+        state.pauseIntent = "";
+        return;
+      }
+
       if (state.currentStation && state.playbackStatus !== "idle" && state.playbackStatus !== "error") {
         if (!state.pauseIntent && (state.playbackStatus === "playing" || state.playbackStatus === "loading")) {
           state.interruptedWhilePlaying = true;
@@ -299,7 +317,9 @@
     state.stations = state.stations.map(function (station) {
       if (station.id === id) {
         return Object.assign({}, updated, {
-          createdAt: station.createdAt || updated.createdAt
+          createdAt: station.createdAt || updated.createdAt,
+          playCount: safeNumber(station.playCount),
+          lastPlayedAt: isValidDate(station.lastPlayedAt) ? station.lastPlayedAt : ""
         });
       }
       return station;
@@ -372,8 +392,18 @@
       streamUrl: streamUrl,
       logoUrl: logoUrl,
       notes: cleanText(input.notes),
-      createdAt: isValidDate(input.createdAt) ? input.createdAt : new Date().toISOString()
+      createdAt: isValidDate(input.createdAt) ? input.createdAt : new Date().toISOString(),
+      playCount: safeNumber(input.playCount),
+      lastPlayedAt: isValidDate(input.lastPlayedAt) ? input.lastPlayedAt : ""
     };
+  }
+
+  function safeNumber(value) {
+    var number = Number(value);
+    if (!Number.isFinite(number) || number < 0) {
+      return 0;
+    }
+    return Math.floor(number);
   }
 
   function createStationId() {
@@ -407,6 +437,10 @@
     return Boolean(value && !Number.isNaN(Date.parse(value)));
   }
 
+  function dateValue(value) {
+    return isValidDate(value) ? Date.parse(value) : 0;
+  }
+
   function generateNameFromUrl(value) {
     var fallback = "Radio senza nome";
     try {
@@ -432,8 +466,8 @@
   function titleCase(value) {
     return String(value)
       .toLowerCase()
-      .replace(/\b[\w\u00c0-\u017f]/g, function (letter) {
-        return letter.toUpperCase();
+      .replace(/(^|[\s/()[\]-])([^\s/()[\]-])/g, function (match, separator, letter) {
+        return separator + letter.toUpperCase();
       });
   }
 
@@ -498,8 +532,24 @@
       return;
     }
 
-    state.stations.forEach(function (station) {
+    getStationsForDisplay().forEach(function (station) {
       els.stationList.appendChild(createStationCard(station, "saved"));
+    });
+  }
+
+  function getStationsForDisplay() {
+    return state.stations.slice().sort(function (a, b) {
+      var playDelta = safeNumber(b.playCount) - safeNumber(a.playCount);
+      if (playDelta !== 0) {
+        return playDelta;
+      }
+
+      var lastPlayedDelta = dateValue(b.lastPlayedAt) - dateValue(a.lastPlayedAt);
+      if (lastPlayedDelta !== 0) {
+        return lastPlayedDelta;
+      }
+
+      return dateValue(b.createdAt) - dateValue(a.createdAt);
     });
   }
 
@@ -538,7 +588,7 @@
 
     playButton.type = "button";
     playButton.addEventListener("click", function () {
-      playStation(station);
+      playStation(station, { countPlay: false });
     });
 
     card.appendChild(logo);
@@ -577,7 +627,7 @@
     playButton.title = "Play";
     playButton.setAttribute("aria-label", "Play " + (station.name || "questa radio"));
     playButton.addEventListener("click", function () {
-      playStation(station);
+      playStation(station, { countPlay: true });
     });
 
     editButton.type = "button";
@@ -731,7 +781,7 @@
       return;
     }
 
-    playStation(Object.assign({}, station, { id: "test-" + Date.now() }));
+    playStation(Object.assign({}, station, { id: "test-" + Date.now() }), { countPlay: false });
     showMessage("Test avviato. Se non senti audio, lo stream potrebbe non essere diretto o compatibile.", "warning");
   }
 
@@ -834,6 +884,17 @@
     state.searchTimer = window.setTimeout(function () {
       performSearch(criteria, false);
     }, 450);
+  }
+
+  function handleFilterChange(changedFilter) {
+    var before = JSON.stringify(readSearchCriteria());
+    handleSearchInput();
+
+    updateDependentFilters(changedFilter).then(function () {
+      if (JSON.stringify(readSearchCriteria()) !== before) {
+        handleSearchInput();
+      }
+    });
   }
 
   async function performSearch(criteria, focusIfEmpty) {
@@ -988,13 +1049,13 @@
     populateFallbackFilters();
 
     try {
-      var countries = await fetchRadioBrowserJson("/json/countries", {
-        order: "stationcount",
-        reverse: "true",
+      var countries = await fetchRadioBrowserJson("/json/countrycodes", {
+        order: "name",
         hidebroken: "true",
-        limit: "80"
+        limit: "300"
       });
-      populateCountryFilter(countries);
+      state.allCountries = normalizeCountries(countries);
+      populateCountryFilter(state.allCountries);
     } catch (error) {
       // I filtri base restano disponibili.
     }
@@ -1004,9 +1065,10 @@
         order: "stationcount",
         reverse: "true",
         hidebroken: "true",
-        limit: "80"
+        limit: "1200"
       });
-      populateTagFilter(tags);
+      state.allTags = normalizeTags(tags).filter(isGenreTag);
+      populateTagFilter(state.allTags);
     } catch (error) {
       // I filtri base restano disponibili.
     }
@@ -1040,51 +1102,38 @@
   }
 
   function populateFallbackFilters() {
-    populateCountryFilter([
-      { name: "Italy", iso_3166_1: "IT" },
-      { name: "United Kingdom", iso_3166_1: "GB" },
-      { name: "United States", iso_3166_1: "US" },
+    state.allCountries = normalizeCountries([
+      { name: "Argentina", iso_3166_1: "AR" },
+      { name: "Brazil", iso_3166_1: "BR" },
       { name: "France", iso_3166_1: "FR" },
       { name: "Germany", iso_3166_1: "DE" },
+      { name: "Italy", iso_3166_1: "IT" },
+      { name: "Mexico", iso_3166_1: "MX" },
       { name: "Spain", iso_3166_1: "ES" },
-      { name: "Brazil", iso_3166_1: "BR" },
-      { name: "Argentina", iso_3166_1: "AR" }
+      { name: "United Kingdom", iso_3166_1: "GB" },
+      { name: "United States", iso_3166_1: "US" }
     ]);
-    populateTagFilter([
-      { name: "jazz" },
-      { name: "news" },
-      { name: "rock" },
-      { name: "classical" },
-      { name: "electronic" },
-      { name: "talk" },
-      { name: "ambient" },
-      { name: "pop" }
-    ]);
+    state.allTags = normalizeTags(GENRE_TAGS);
+    populateCountryFilter(state.allCountries);
+    populateTagFilter(state.allTags);
   }
 
   function populateCountryFilter(countries) {
     var currentValue = els.searchCountry.value;
     resetSelect(els.searchCountry, "Tutti i paesi");
 
-    countries
-      .map(function (country) {
-        return {
-          label: cleanText(country.name),
-          value: cleanText(country.iso_3166_1 || country.countrycode)
-        };
-      })
-      .filter(function (country) {
-        return country.label && country.value;
-      })
-      .forEach(function (country) {
-        var option = document.createElement("option");
-        option.value = country.value;
-        option.textContent = country.label;
-        els.searchCountry.appendChild(option);
-      });
+    normalizeCountries(countries).forEach(function (country) {
+      var option = document.createElement("option");
+      option.value = country.value;
+      option.textContent = country.label;
+      els.searchCountry.appendChild(option);
+    });
 
     if (currentValue) {
       els.searchCountry.value = currentValue;
+      if (els.searchCountry.value !== currentValue) {
+        els.searchCountry.value = "";
+      }
     }
   }
 
@@ -1092,20 +1141,173 @@
     var currentValue = els.searchTag.value;
     resetSelect(els.searchTag, "Tutti i generi");
 
-    tags
-      .map(function (tag) {
-        return cleanText(tag.name);
-      })
-      .filter(Boolean)
-      .forEach(function (tag) {
-        var option = document.createElement("option");
-        option.value = tag;
-        option.textContent = titleCase(tag);
-        els.searchTag.appendChild(option);
-      });
+    normalizeTags(tags).forEach(function (tag) {
+      var option = document.createElement("option");
+      option.value = tag.value;
+      option.textContent = tag.label;
+      els.searchTag.appendChild(option);
+    });
 
     if (currentValue) {
       els.searchTag.value = currentValue;
+      if (els.searchTag.value !== currentValue) {
+        els.searchTag.value = "";
+      }
+    }
+  }
+
+  async function updateDependentFilters(changedFilter) {
+    var criteria = readSearchCriteria();
+    var requestId = state.filterRequestId + 1;
+    state.filterRequestId = requestId;
+
+    try {
+      if (changedFilter === "country") {
+        if (!criteria.country) {
+          populateTagFilter(state.allTags);
+          return;
+        }
+
+        var countryStations = await fetchFilterStations({ country: criteria.country });
+        if (requestId !== state.filterRequestId) {
+          return;
+        }
+        populateTagFilter(extractTagsFromStations(countryStations).filter(isGenreTag));
+        return;
+      }
+
+      if (changedFilter === "tag") {
+        if (!criteria.tag) {
+          populateCountryFilter(state.allCountries);
+          return;
+        }
+
+        var tagStations = await fetchFilterStations({ tag: criteria.tag });
+        if (requestId !== state.filterRequestId) {
+          return;
+        }
+        populateCountryFilter(extractCountriesFromStations(tagStations));
+      }
+    } catch (error) {
+      if (changedFilter === "country") {
+        populateTagFilter(state.allTags);
+      } else {
+        populateCountryFilter(state.allCountries);
+      }
+    }
+  }
+
+  async function fetchFilterStations(criteria) {
+    var params = buildStationSearchParams({
+      query: "",
+      country: criteria.country || "",
+      tag: criteria.tag || ""
+    }, "");
+    params.set("limit", String(FILTER_SAMPLE_LIMIT));
+    return fetchRadioBrowserStations(params);
+  }
+
+  function extractTagsFromStations(stations) {
+    var tags = [];
+    stations.forEach(function (station) {
+      cleanText(station.tags).split(",").forEach(function (tag) {
+        var cleaned = cleanText(tag);
+        if (cleaned) {
+          tags.push({ name: cleaned });
+        }
+      });
+    });
+    return normalizeTags(tags);
+  }
+
+  function extractCountriesFromStations(stations) {
+    return normalizeCountries(stations.map(function (station) {
+      return {
+        name: station.country,
+        iso_3166_1: station.countrycode
+      };
+    }));
+  }
+
+  function normalizeCountries(countries) {
+    var seen = {};
+    var displayNames = getCountryDisplayNames();
+
+    return (countries || [])
+      .map(function (country) {
+        var code = cleanText(country.value || country.iso_3166_1 || country.countrycode || country.code || country.name).toUpperCase();
+        var label = cleanText(country.country || country.label || (code.length === 2 && displayNames ? displayNames.of(code) : "") || country.name);
+
+        return {
+          label: label,
+          value: code
+        };
+      })
+      .filter(function (country) {
+        if (!country.label || country.value.length !== 2 || seen[country.value]) {
+          return false;
+        }
+
+        seen[country.value] = true;
+        return true;
+      })
+      .sort(compareByLabel);
+  }
+
+  function normalizeTags(tags) {
+    var seen = {};
+
+    return (tags || [])
+      .map(function (tag) {
+        var name = cleanTagName(typeof tag === "string" ? tag : tag.value || tag.name);
+        return {
+          label: titleCase(cleanTagName(tag.label) || name),
+          value: name
+        };
+      })
+      .filter(function (tag) {
+        var key = tag.value.toLowerCase();
+        if (!tag.value || seen[key]) {
+          return false;
+        }
+
+        seen[key] = true;
+        return true;
+      })
+      .sort(compareByLabel);
+  }
+
+  function isGenreTag(tag) {
+    var value = cleanText(tag.value).toLowerCase();
+    if (!value) {
+      return false;
+    }
+
+    return GENRE_TAGS.some(function (genre) {
+      return value === genre || value.indexOf(genre + " ") !== -1 || value.indexOf(" " + genre) !== -1;
+    });
+  }
+
+  function cleanTagName(value) {
+    return cleanText(value)
+      .replace(/^[^0-9A-Za-zÀ-ÖØ-öø-ÿ]+/, "")
+      .replace(/[^0-9A-Za-zÀ-ÖØ-öø-ÿ]+$/, "")
+      .replace(/\s+/g, " ");
+  }
+
+  function compareByLabel(a, b) {
+    return a.label.localeCompare(b.label, "it", { sensitivity: "base" });
+  }
+
+  function getCountryDisplayNames() {
+    if (!("Intl" in window) || !("DisplayNames" in Intl)) {
+      return null;
+    }
+
+    try {
+      return new Intl.DisplayNames(["it"], { type: "region" });
+    } catch (error) {
+      return null;
     }
   }
 
@@ -1217,7 +1419,8 @@
     els.searchStatus.textContent = message || "";
   }
 
-  function playStation(station) {
+  function playStation(station, options) {
+    var opts = options || {};
     var sanitized = sanitizeStation(station);
     if (!sanitized) {
       showMessage("Questa radio non ha un URL stream valido.", "error");
@@ -1234,7 +1437,37 @@
       return;
     }
 
+    if (opts.countPlay) {
+      sanitized = recordStationPlay(sanitized);
+    }
+
     selectStation(sanitized, true);
+  }
+
+  function recordStationPlay(station) {
+    var index = state.stations.findIndex(function (item) {
+      return sameStationOrUrl(item, station);
+    });
+
+    if (index === -1) {
+      return station;
+    }
+
+    var updated = Object.assign({}, state.stations[index], {
+      playCount: safeNumber(state.stations[index].playCount) + 1,
+      lastPlayedAt: new Date().toISOString()
+    });
+
+    state.stations[index] = updated;
+    saveStations(state.stations);
+
+    if (state.currentStation && sameStationOrUrl(state.currentStation, updated)) {
+      state.currentStation = updated;
+      saveCurrentStation(updated);
+    }
+
+    renderStations();
+    return updated;
   }
 
   function selectStation(station, shouldPlay) {
@@ -1257,10 +1490,16 @@
     highlightPlayer();
   }
 
-  function playCurrentStation() {
+  function playCurrentStation(options) {
+    var opts = options || {};
     if (!state.currentStation) {
       showMessage("Scegli prima una radio.", "warning");
       return;
+    }
+
+    if (opts.countPlay) {
+      state.currentStation = recordStationPlay(state.currentStation);
+      saveCurrentStation(state.currentStation);
     }
 
     if (!els.audio.src && state.currentStation.streamUrl) {
@@ -1274,9 +1513,15 @@
     setMediaVolume(0);
     updateMediaSessionMetadata();
     setPlaybackStatus("loading");
+    var requestId = state.playRequestId + 1;
+    state.playRequestId = requestId;
     var playPromise = els.audio.play();
     if (playPromise && typeof playPromise.catch === "function") {
       playPromise.catch(function () {
+        if (requestId !== state.playRequestId) {
+          return;
+        }
+
         setMediaVolume(AUDIO_TARGET_VOLUME);
         setPlaybackStatus("paused");
         showPlayerError("L'audio non è partito. Tocca Play nel player o verifica che lo stream sia compatibile.");
@@ -1285,39 +1530,16 @@
   }
 
   function handlePlayerToggle() {
-    if (!state.currentStation || state.playbackStatus === "loading") {
+    if (!state.currentStation) {
       return;
     }
 
-    if (els.audio.paused) {
-      playCurrentStation();
+    if (state.playbackStatus === "loading" || !els.audio.paused) {
+      stopPlayer(false, { fade: true, intent: "stop" });
       return;
     }
 
-    pauseCurrentStation({ fade: true, intent: "user" });
-  }
-
-  function pauseCurrentStation(options) {
-    var opts = options || {};
-    state.pauseIntent = opts.intent || "user";
-    state.interruptedWhilePlaying = false;
-
-    var finishPause = function () {
-      try {
-        els.audio.pause();
-      } catch (error) {
-        // Ignora errori del player nativo.
-      }
-      setPlaybackStatus("paused");
-      updateMediaSessionPlaybackState("paused");
-      setMediaVolume(AUDIO_TARGET_VOLUME);
-    };
-
-    if (opts.fade) {
-      fadeMediaVolume(0, AUDIO_FADE_MS, finishPause);
-    } else {
-      finishPause();
-    }
+    playCurrentStation({ countPlay: true });
   }
 
   function renderPlayer() {
@@ -1330,7 +1552,6 @@
       els.playerTitle.textContent = "Nessuna radio selezionata";
       els.audio.hidden = true;
       els.playerToggleButton.disabled = true;
-      els.stopButton.hidden = true;
       setPlaybackStatus("idle");
       return;
     }
@@ -1343,7 +1564,6 @@
     els.playerTitle.textContent = state.currentStation.name;
     els.audio.hidden = false;
     els.playerToggleButton.disabled = false;
-    els.stopButton.hidden = false;
     updatePlayerButton();
   }
 
@@ -1365,6 +1585,7 @@
     var opts = options || {};
     state.pauseIntent = opts.intent || "stop";
     state.interruptedWhilePlaying = false;
+    state.playRequestId += 1;
 
     var finishStop = function () {
       try {
@@ -1377,13 +1598,16 @@
       els.audio.dataset.streamUrl = "";
       els.audio.load();
       setMediaVolume(AUDIO_TARGET_VOLUME);
-      setPlaybackStatus("idle");
-      updateMediaSessionPlaybackState("none");
 
       if (clearCurrent) {
         state.currentStation = null;
         saveCurrentStation(null);
+        setPlaybackStatus("idle");
+        updateMediaSessionPlaybackState("none");
         renderPlayer();
+      } else {
+        setPlaybackStatus("ready");
+        updateMediaSessionPlaybackState("paused");
       }
     };
 
@@ -1490,13 +1714,13 @@
       }
 
       navigator.mediaSession.setActionHandler("play", function () {
-        playCurrentStation();
+        playCurrentStation({ countPlay: true });
       });
       navigator.mediaSession.setActionHandler("pause", function () {
-        pauseCurrentStation({ fade: true, intent: "user" });
+        stopPlayer(false, { fade: true, intent: "stop" });
       });
       navigator.mediaSession.setActionHandler("stop", function () {
-        stopPlayer(true, { fade: true, intent: "stop" });
+        stopPlayer(false, { fade: true, intent: "stop" });
       });
     } catch (error) {
       // Media Session non e' disponibile ovunque.
@@ -1530,13 +1754,13 @@
 
     if (state.playbackStatus === "loading") {
       els.playerToggleIcon.textContent = "";
-      els.playerToggleButton.setAttribute("aria-label", "Caricamento " + state.currentStation.name);
+      els.playerToggleButton.setAttribute("aria-label", "Stop caricamento " + state.currentStation.name);
       return;
     }
 
     if (!els.audio.paused && state.playbackStatus === "playing") {
-      els.playerToggleIcon.textContent = "Ⅱ";
-      els.playerToggleButton.setAttribute("aria-label", "Pausa " + state.currentStation.name);
+      els.playerToggleIcon.textContent = "■";
+      els.playerToggleButton.setAttribute("aria-label", "Stop " + state.currentStation.name);
       return;
     }
 

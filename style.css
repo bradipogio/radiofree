@@ -18,7 +18,7 @@
   --shadow: 0 10px 28px rgba(22, 33, 43, 0.08);
   --radius: 8px;
   --tabbar-height: 56px;
-  --player-height: 70px;
+  --player-height: 76px;
   --content-width: 720px;
 }
 
@@ -405,13 +405,6 @@ textarea:disabled {
   color: var(--danger);
 }
 
-.button-stop {
-  align-self: center;
-  border-color: var(--line);
-  background: transparent;
-  white-space: nowrap;
-}
-
 .form-card,
 .search-card {
   padding: 14px;
@@ -539,7 +532,7 @@ textarea::placeholder {
 .player-bar {
   bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 48px auto;
+  grid-template-columns: 40px minmax(0, 1fr) 56px;
   align-items: center;
   gap: 8px;
   min-height: var(--player-height);
@@ -596,11 +589,12 @@ audio {
 .player-toggle-button {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   padding: 0;
   background: var(--primary);
   color: #ffffff;
+  font-size: 1.15rem;
 }
 
 .player-toggle-button span {
