@@ -1,13 +1,16 @@
-const CACHE_NAME = "le-mie-radio-static-v1";
+const CACHE_NAME = "le-mie-radio-static-v2";
 const APP_ASSETS = [
   "./",
   "./index.html",
-  "./style.css",
-  "./app.js",
+  "./style.css?v=20260520-2",
+  "./app.js?v=20260520-2",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png"
 ];
+const APP_ASSET_URLS = APP_ASSETS.map(function (asset) {
+  return new URL(asset, self.location).href;
+});
 
 self.addEventListener("install", function (event) {
   event.waitUntil(
@@ -64,18 +67,14 @@ self.addEventListener("fetch", function (event) {
     return;
   }
 
+  if (APP_ASSET_URLS.indexOf(request.url) === -1) {
+    return;
+  }
+
   event.respondWith(
-    caches.match(request).then(function (cachedResponse) {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-
-      return fetch(request).then(function (networkResponse) {
-        const assetUrls = APP_ASSETS.map(function (asset) {
-          return new URL(asset, self.registration.scope).href;
-        });
-
-        if (networkResponse.ok && assetUrls.indexOf(request.url) !== -1) {
+    fetch(request)
+      .then(function (networkResponse) {
+        if (networkResponse.ok) {
           const responseCopy = networkResponse.clone();
           caches.open(CACHE_NAME).then(function (cache) {
             cache.put(request, responseCopy);
@@ -83,7 +82,9 @@ self.addEventListener("fetch", function (event) {
         }
 
         return networkResponse;
-      });
-    })
+      })
+      .catch(function () {
+        return caches.match(request);
+      })
   );
 });

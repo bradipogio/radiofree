@@ -1175,9 +1175,13 @@
     }
 
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("./service-worker.js").catch(function () {
-        // L'app resta utilizzabile anche senza service worker.
-      });
+      navigator.serviceWorker.register("./service-worker.js")
+        .then(function (registration) {
+          registration.update();
+        })
+        .catch(function () {
+          // L'app resta utilizzabile anche senza service worker.
+        });
     });
   }
 })();
