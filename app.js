@@ -1,6 +1,8 @@
 (function () {
   "use strict";
 
+  var APP_VERSION = "20260607-2";
+
   var STORAGE_KEYS = {
     stations: "le-mie-radio:stations",
     current: "le-mie-radio:current-station"
@@ -97,6 +99,7 @@
     els.settingsToggle = document.getElementById("settingsToggle");
     els.settingsPanel = document.getElementById("settingsPanel");
     els.settingsAddBtn = document.getElementById("settingsAddBtn");
+    els.refreshAppBtn = document.getElementById("refreshAppBtn");
 
     els.searchForm = document.getElementById("searchForm");
     els.searchQuery = document.getElementById("searchQuery");
@@ -157,6 +160,7 @@
       closeSettings();
     });
     els.importFile.addEventListener("change", handleImportFile);
+    els.refreshAppBtn.addEventListener("click", refreshApp);
 
     els.playerToggleButton.addEventListener("click", handlePlayerToggle);
     els.audio.addEventListener("play", function () {
@@ -2084,6 +2088,40 @@
     setSearchStatus("");
     renderStations();
     showMessage("Dati locali cancellati.", "success");
+  }
+
+  async function refreshApp() {
+    closeSettings();
+    showMessage("Aggiorno l'app...", "info", true);
+
+    try {
+      if ("caches" in window) {
+        var cacheNames = await caches.keys();
+        await Promise.all(cacheNames
+          .filter(function (cacheName) {
+            return cacheName.indexOf("le-mie-radio-") === 0;
+          })
+          .map(function (cacheName) {
+            return caches.delete(cacheName);
+          }));
+      }
+
+      if ("serviceWorker" in navigator) {
+        var registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map(function (registration) {
+          if (registration.waiting) {
+            registration.waiting.postMessage({ type: "SKIP_WAITING" });
+          }
+          return registration.update();
+        }));
+      }
+    } catch (error) {
+      // Anche se la cache non si svuota, proviamo comunque a ricaricare.
+    }
+
+    var url = new URL(window.location.href);
+    url.searchParams.set("v", APP_VERSION);
+    window.location.replace(url.toString());
   }
 
   function showFormError(message) {

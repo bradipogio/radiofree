@@ -1,9 +1,9 @@
-const CACHE_NAME = "le-mie-radio-static-v8";
+const CACHE_NAME = "le-mie-radio-static-v9";
 const APP_ASSETS = [
   "./",
   "./index.html",
-  "./style.css?v=20260607-1",
-  "./app.js?v=20260607-1",
+  "./style.css?v=20260607-2",
+  "./app.js?v=20260607-2",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png"
@@ -39,6 +39,12 @@ self.addEventListener("activate", function (event) {
         return self.clients.claim();
       })
   );
+});
+
+self.addEventListener("message", function (event) {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("fetch", function (event) {

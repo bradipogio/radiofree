@@ -109,6 +109,12 @@ Formato esportato:
 
 L'import accetta anche un semplice array JSON di radio.
 
+## Aggiornare la PWA
+
+Se dopo una pubblicazione GitHub Pages o la PWA installata su iPhone mostra ancora una versione vecchia, apri l'ingranaggio e usa `Aggiorna`.
+
+Questa azione svuota solo la cache statica dell'app e ricarica la pagina. Le radio salvate in locale non vengono cancellate.
+
 ## Pubblicità negli stream
 
 L'app non contiene pubblicità, tracking o analytics. Eventuali spot interni allo stream della radio vengono trasmessi dalla radio stessa e non possono essere rimossi dall'app.
