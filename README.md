@@ -44,6 +44,8 @@ L'app non ferma l'audio quando passa in background, quindi una radio già avviat
 
 Il player usa i controlli multimediali del sistema dove disponibili e prova a gestire le interruzioni in modo morbido: fade in quando parte, fade out su pausa/stop, e ripresa automatica best-effort dopo pause non richieste dall'utente.
 
+Il player mostra uno stato breve (`Carico...`, `In riproduzione`, `Fermata`, `Errore stream`). Il pulsante principale alterna Play e Stop: Stop ferma lo stream ma lascia la radio selezionata.
+
 Durante telefonate, Siri, notifiche vocali o altre interruzioni, iOS mantiene il controllo finale dell'audio. In alcuni casi potrebbe mettere in pausa lo stream e richiedere un nuovo tap su Play.
 
 ## Salvare radio
@@ -54,6 +56,8 @@ Se lasci vuoto il nome, l'app prova a generarlo dall'URL. Se una radio con lo st
 
 Nella lista principale le radio che avvii più spesso salgono automaticamente in alto. Il conteggio resta salvato solo nel browser.
 
+Quando una radio è in riproduzione, la card corrispondente viene evidenziata e mostra il badge `In play`.
+
 ## Homepage e URL stream
 
 La homepage della radio è una pagina web visitabile, per esempio `https://nomeradio.example`.
@@ -62,13 +66,15 @@ L'URL stream è invece l'indirizzo diretto del flusso audio, per esempio un link
 
 Alcune radio non funzionano se lo stream non è compatibile con il browser, se risponde lentamente, se usa formati non supportati o se usa `http://` dentro una pagina pubblicata in `https://`.
 
+L'app mostra avvisi non bloccanti quando un URL sembra una homepage o quando uno stream potrebbe essere bloccato dal browser.
+
 ## Ricerca online
 
 La tab `Cerca` usa la Radio Browser API pubblica per trovare radio online. Non richiede API key.
 
 La ricerca è opzionale: se Radio Browser non risponde o la rete non è disponibile, puoi comunque aggiungere radio manualmente dal pulsante impostazioni.
 
-I risultati arrivano da Radio Browser, un database pubblico e collaborativo di web radio. La ricerca usa nome, paese e genere/tag; quando scrivi testo senza scegliere un genere, l'app prova sia per nome sia per tag e mostra fino a 100 risultati validi. I menu di paese e genere sono ordinati alfabeticamente e si restringono a vicenda in base alle stazioni trovate. Se Radio Browser non fornisce un logo, l'app prova anche il favicon della homepage.
+I risultati arrivano da Radio Browser, un database pubblico e collaborativo di web radio. La ricerca usa nome, paese e genere/tag; quando scrivi testo senza scegliere un genere, l'app prova sia per nome sia per tag e mostra fino a 100 risultati validi. I menu di paese e genere sono ordinati alfabeticamente e si restringono a vicenda in base alle stazioni trovate. Sopra ai risultati viene mostrato un riepilogo dei filtri attivi. Se Radio Browser non fornisce un logo, l'app prova anche il favicon della homepage.
 
 ## Import/export
 

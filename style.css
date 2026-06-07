@@ -18,7 +18,7 @@
   --shadow: 0 10px 28px rgba(22, 33, 43, 0.08);
   --radius: 8px;
   --tabbar-height: 56px;
-  --player-height: 76px;
+  --player-height: 90px;
   --content-width: 720px;
 }
 
@@ -127,18 +127,24 @@ textarea:disabled {
 }
 
 .settings-panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
+  position: fixed;
+  top: calc(64px + env(safe-area-inset-top));
+  right: calc(14px + env(safe-area-inset-right));
+  left: calc(14px + env(safe-area-inset-left));
   z-index: 30;
   display: grid;
-  width: 176px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: auto;
   gap: 8px;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
   box-shadow: var(--shadow);
+}
+
+.settings-panel .button {
+  min-height: 48px;
 }
 
 .message {
@@ -191,6 +197,15 @@ textarea:disabled {
   padding: 10px;
 }
 
+.station-card.is-current {
+  border-color: rgba(18, 107, 117, 0.38);
+}
+
+.station-card.is-playing {
+  border-color: var(--primary);
+  background: linear-gradient(90deg, var(--primary-soft), var(--surface) 46%);
+}
+
 .saved-station-card {
   grid-template-columns: 48px minmax(0, 1fr) auto auto;
   align-items: center;
@@ -208,13 +223,40 @@ textarea:disabled {
   letter-spacing: 0;
 }
 
+.station-title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.station-title-row .station-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.current-badge {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
 .station-meta,
 .station-notes,
 .station-date,
 .search-status,
+.search-summary,
 .field-help,
 .inline-error,
 .player-label,
+.player-status,
 .player-error {
   color: var(--muted);
   font-size: 0.9rem;
@@ -222,9 +264,15 @@ textarea:disabled {
 
 .station-meta,
 .station-notes,
-.station-date {
+.station-date,
+.station-warning {
   margin: 4px 0 0;
   overflow-wrap: anywhere;
+}
+
+.station-warning {
+  color: var(--warning);
+  font-size: 0.88rem;
 }
 
 .station-details {
@@ -264,6 +312,12 @@ textarea:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.saved-station-card.is-playing .saved-play-button {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #ffffff;
 }
 
 .station-logo {
@@ -487,6 +541,16 @@ textarea::placeholder {
   margin: 14px 2px;
 }
 
+.search-summary {
+  margin: 14px 2px 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(18, 107, 117, 0.2);
+  border-radius: var(--radius);
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  font-weight: 750;
+}
+
 .backup-panel {
   margin-top: 14px;
   padding: 10px;
@@ -532,11 +596,11 @@ textarea::placeholder {
 .player-bar {
   bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 56px;
+  grid-template-columns: 42px minmax(0, 1fr) 72px;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-height: var(--player-height);
-  padding: 8px 12px;
+  padding: 10px 12px;
   border-top: 1px solid var(--line);
   box-shadow: 0 -10px 28px rgba(22, 33, 43, 0.08);
 }
@@ -582,6 +646,10 @@ body:not(.has-player) .player-bar {
   color: var(--danger);
 }
 
+.player-status {
+  margin: 2px 0 0;
+}
+
 audio {
   display: none;
 }
@@ -589,12 +657,12 @@ audio {
 .player-toggle-button {
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 56px;
+  width: 72px;
+  height: 72px;
   padding: 0;
   background: var(--primary);
   color: #ffffff;
-  font-size: 1.15rem;
+  font-size: 1.35rem;
 }
 
 .player-toggle-button span {
@@ -648,6 +716,16 @@ audio {
 @media (min-width: 700px) {
   .app-main {
     padding-inline: 18px;
+  }
+
+  .settings-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    left: auto;
+    grid-template-columns: 1fr;
+    width: 190px;
+    padding: 10px;
   }
 
   .form-actions {
