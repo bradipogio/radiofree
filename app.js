@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var APP_VERSION = "20260607-2";
+  var APP_VERSION = "20260618-1";
 
   var STORAGE_KEYS = {
     stations: "le-mie-radio:stations",
@@ -2023,15 +2023,40 @@
       return;
     }
 
-    var summary = mergeImportedStations(incoming);
+    var mode = askImportMode();
+    if (!mode) {
+      return;
+    }
+
+    var summary = mergeImportedStations(incoming, mode);
     renderStations();
     setActiveTab("radio");
-    showMessage("Import completato: " + summary.imported + " importate, " + summary.duplicates + " duplicate saltate, " + summary.invalid + " non valide ignorate.", "success", true);
+    showMessage(importSummaryMessage(summary), summary.imported ? "success" : "warning", true);
   }
 
-  function mergeImportedStations(incoming) {
-    var summary = { imported: 0, duplicates: 0, invalid: 0 };
-    var knownUrls = new Set(state.stations.map(function (station) {
+  function askImportMode() {
+    var answer = window.prompt("Come vuoi importare la lista?\n\nScrivi:\n- aggiungi: mantiene le radio esistenti e aggiunge le nuove\n- sostituisci: cancella la lista attuale e usa il file importato", "aggiungi");
+    var normalized = cleanText(answer).toLowerCase();
+
+    if (!normalized) {
+      showMessage("Import annullato.", "warning");
+      return "";
+    }
+    if (normalized === "aggiungi" || normalized === "a") {
+      return "append";
+    }
+    if (normalized === "sostituisci" || normalized === "s") {
+      return "replace";
+    }
+
+    showMessage("Scelta non riconosciuta. Scrivi aggiungi oppure sostituisci.", "error", true);
+    return "";
+  }
+
+  function mergeImportedStations(incoming, mode) {
+    var summary = { imported: 0, duplicates: 0, invalid: 0, mode: mode };
+    var initialStations = mode === "replace" ? [] : state.stations;
+    var knownUrls = new Set(initialStations.map(function (station) {
       return normalizeUrl(station.streamUrl).toLowerCase();
     }));
     var validStations = [];
@@ -2054,12 +2079,52 @@
       summary.imported += 1;
     });
 
+    if (mode === "replace") {
+      if (!validStations.length) {
+        return summary;
+      }
+
+      state.stations = validStations;
+      saveStations(state.stations);
+      reconcileCurrentStationAfterReplace();
+      return summary;
+    }
+
     if (validStations.length) {
       state.stations = validStations.concat(state.stations);
       saveStations(state.stations);
     }
 
     return summary;
+  }
+
+  function reconcileCurrentStationAfterReplace() {
+    if (!state.currentStation) {
+      return;
+    }
+
+    var matchingStation = state.stations.find(function (station) {
+      return sameStationOrUrl(station, state.currentStation);
+    });
+
+    if (matchingStation) {
+      state.currentStation = matchingStation;
+      saveCurrentStation(matchingStation);
+      selectStation(matchingStation, false);
+      return;
+    }
+
+    stopPlayer(true);
+  }
+
+  function importSummaryMessage(summary) {
+    var action = summary.mode === "replace" ? "sostituita" : "aggiornata";
+
+    if (summary.mode === "replace" && !summary.imported) {
+      return "Import annullato: nessuna radio valida nel file. " + summary.invalid + " non valide ignorate.";
+    }
+
+    return "Lista " + action + ": " + summary.imported + " importate, " + summary.duplicates + " duplicate saltate, " + summary.invalid + " non valide ignorate.";
   }
 
   function resetLocalData() {

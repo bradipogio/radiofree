@@ -86,7 +86,9 @@ Per trasferire i dati:
 - invia il file via AirDrop, iCloud Drive, email, WhatsApp, Telegram, Note o un altro sistema;
 - sull'altro dispositivo usa `Importa` e scegli il file JSON.
 
-L'import unisce le radio alla lista esistente. Le radio duplicate, riconosciute dallo stesso `streamUrl`, vengono saltate. Le radio non valide vengono ignorate.
+Durante l'import l'app chiede se vuoi `aggiungi` oppure `sostituisci`.
+
+Con `aggiungi`, le radio importate vengono unite alla lista esistente. Con `sostituisci`, la lista attuale viene rimpiazzata dalle radio valide presenti nel file. Le radio duplicate, riconosciute dallo stesso `streamUrl`, vengono saltate. Le radio non valide vengono ignorate.
 
 Formato esportato:
 
