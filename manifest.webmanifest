@@ -1,12 +1,12 @@
 {
-  "name": "Le mie radio",
+  "name": "Preferiti radio",
   "short_name": "Radio",
-  "description": "Una piccola PWA per salvare e ascoltare web radio personali.",
+  "description": "Una piccola PWA per ascoltare e gestire web radio preferite.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f4f7fb",
-  "theme_color": "#126b75",
+  "background_color": "#f6f4f0",
+  "theme_color": "#3046a4",
   "icons": [
     {
       "src": "icons/icon-192.png",

@@ -1,8 +1,8 @@
-# Le mie radio
+# Preferiti radio
 
-Piccola web app/PWA statica per salvare e ascoltare web radio personali da iPhone e desktop.
+Piccola web app/PWA statica per ascoltare e gestire web radio preferite da iPhone e desktop.
 
-Funziona senza backend, login, database online, API key, tracking, analytics o cookie non necessari. Le radio vengono salvate nel `localStorage` del browser.
+Funziona senza backend, login, database online, API key, tracking, analytics o cookie non necessari. I preferiti vengono salvati nel `localStorage` del browser.
 
 ## File principali
 
@@ -48,15 +48,17 @@ Il player mostra uno stato breve (`Carico...`, `In riproduzione`, `Fermata`, `Er
 
 Durante telefonate, Siri, notifiche vocali o altre interruzioni, iOS mantiene il controllo finale dell'audio. In alcuni casi potrebbe mettere in pausa lo stream e richiedere un nuovo tap su Play.
 
-## Salvare radio
+## Preferiti
 
-Dal pulsante impostazioni in alto a destra scegli `Aggiungi`, incolla l'URL diretto dello stream audio, inserisci un nome se vuoi, poi usa `Test Play` o `Salva radio`.
+Dal pulsante impostazioni in alto a destra scegli `Aggiungi`, incolla l'URL diretto dello stream audio, inserisci un nome se vuoi, poi usa `Test Play` o `Aggiungi ai preferiti`.
 
-Se lasci vuoto il nome, l'app prova a generarlo dall'URL. Se una radio con lo stesso URL è già salvata, l'app evita il duplicato.
+Se lasci vuoto il nome, l'app prova a generarlo dall'URL. Se una radio con lo stesso URL è già nei preferiti, l'app evita il duplicato.
 
 Nella lista principale le radio che avvii più spesso salgono automaticamente in alto. Il conteggio resta salvato solo nel browser.
 
 Quando una radio è in riproduzione, la card corrispondente viene evidenziata e mostra il badge `In play`.
+
+Nei risultati di ricerca e nel player la stellina indica lo stato del preferito: vuota quando la radio non è ancora aggiunta, piena quando è già nei preferiti.
 
 ## Homepage e URL stream
 
@@ -78,7 +80,7 @@ I risultati arrivano da Radio Browser, un database pubblico e collaborativo di w
 
 ## Import/export
 
-Le radio sono salvate localmente nel singolo browser. Una lista salvata su iPhone non appare automaticamente su Mac o su un altro telefono.
+I preferiti sono salvati localmente nel singolo browser. Una lista creata su iPhone non appare automaticamente su Mac o su un altro telefono.
 
 Per trasferire i dati:
 
@@ -115,7 +117,7 @@ L'import accetta anche un semplice array JSON di radio.
 
 Se dopo una pubblicazione GitHub Pages o la PWA installata su iPhone mostra ancora una versione vecchia, apri l'ingranaggio e usa `Aggiorna`.
 
-Questa azione svuota solo la cache statica dell'app e ricarica la pagina. Le radio salvate in locale non vengono cancellate.
+Questa azione svuota solo la cache statica dell'app e ricarica la pagina. I preferiti locali non vengono cancellati.
 
 ## Pubblicità negli stream
 

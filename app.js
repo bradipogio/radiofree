@@ -833,7 +833,7 @@
     }
 
     if (source === "search" && !station.codec && !station.bitrate) {
-      return "Informazioni audio mancanti: prova Play prima di salvarla.";
+      return "Informazioni audio mancanti: prova Play prima di aggiungerla ai preferiti.";
     }
 
     return "";
@@ -1997,7 +1997,7 @@
 
         navigator.mediaSession.metadata = new MediaMetadata({
           title: state.currentStation.name,
-          artist: "Le mie radio",
+          artist: "Preferiti radio",
           album: "Web radio",
           artwork: artwork
         });
@@ -2095,7 +2095,7 @@
     window.setTimeout(function () {
       URL.revokeObjectURL(url);
     }, 1000);
-    showMessage("File JSON generato. Puoi condividerlo o salvarlo sul dispositivo.", "success");
+    showMessage("File JSON generato. Puoi condividerlo o conservarlo sul dispositivo.", "success");
   }
 
   function handleImportFile(event) {
@@ -2236,7 +2236,7 @@
   }
 
   function resetLocalData() {
-    var ok = window.confirm("Cancellare tutte le radio salvate e l'ultima radio selezionata da questo browser?");
+    var ok = window.confirm("Cancellare tutti i preferiti e l'ultima radio selezionata da questo browser?");
     if (!ok) {
       return;
     }
