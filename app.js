@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var APP_VERSION = "20260618-1";
+  var APP_VERSION = "20260625-1";
 
   var STORAGE_KEYS = {
     stations: "le-mie-radio:stations",
@@ -119,6 +119,7 @@
     els.playerStatus = document.getElementById("playerStatus");
     els.audio = document.getElementById("audioPlayer");
     els.playerError = document.getElementById("playerError");
+    els.playerFavoriteButton = document.getElementById("playerFavoriteButton");
     els.playerToggleButton = document.getElementById("playerToggleButton");
     els.playerToggleIcon = document.getElementById("playerToggleIcon");
   }
@@ -163,6 +164,11 @@
     els.refreshAppBtn.addEventListener("click", refreshApp);
 
     els.playerToggleButton.addEventListener("click", handlePlayerToggle);
+    els.playerFavoriteButton.addEventListener("click", function () {
+      if (state.currentStation) {
+        toggleFavorite(state.currentStation);
+      }
+    });
     els.audio.addEventListener("play", function () {
       state.pauseIntent = "";
       state.interruptedWhilePlaying = false;
@@ -363,6 +369,7 @@
     }
 
     renderStations();
+    updateFavoriteButtons();
   }
 
   function findDuplicateByUrl(streamUrl, ignoreId) {
@@ -370,6 +377,65 @@
     return state.stations.find(function (station) {
       return station.id !== ignoreId && normalizeUrl(station.streamUrl).toLowerCase() === normalized;
     });
+  }
+
+  function isFavorite(station) {
+    return Boolean(station && findDuplicateByUrl(station.streamUrl));
+  }
+
+  function toggleFavorite(station) {
+    if (!station || !station.streamUrl) {
+      showMessage("Scegli prima una radio.", "warning");
+      return;
+    }
+
+    var existing = findDuplicateByUrl(station.streamUrl);
+    if (existing) {
+      removeFavorite(existing);
+      showMessage("Radio rimossa dai preferiti.", "success");
+      return;
+    }
+
+    addFavorite(station);
+  }
+
+  function addFavorite(station) {
+    var persisted = addStation({
+      name: station.name,
+      streamUrl: station.streamUrl,
+      logoUrl: station.logoUrl,
+      notes: station.country ? "Trovata su Radio Browser - " + station.country : cleanText(station.notes),
+      createdAt: new Date().toISOString()
+    });
+
+    var saved = findDuplicateByUrl(station.streamUrl);
+    if (saved && state.currentStation && sameStationOrUrl(state.currentStation, station)) {
+      state.currentStation = Object.assign({}, saved);
+      saveCurrentStation(state.currentStation);
+      renderPlayer();
+    }
+
+    updateFavoriteButtons();
+    showMessage(persisted ? "Radio aggiunta ai preferiti." : "Radio aggiunta solo per questa sessione: il salvataggio locale non è disponibile.", persisted ? "success" : "warning");
+  }
+
+  function removeFavorite(station) {
+    state.stations = state.stations.filter(function (item) {
+      return !sameStationOrUrl(item, station);
+    });
+    saveStations(state.stations);
+
+    if (state.currentStation && sameStationOrUrl(state.currentStation, station)) {
+      state.currentStation = Object.assign({}, state.currentStation, {
+        id: "current-" + Date.now()
+      });
+      saveCurrentStation(state.currentStation);
+      renderPlayer();
+    }
+
+    renderStations();
+    updateFavoriteButtons();
+    updateStationCardStates();
   }
 
   function sanitizeStation(input) {
@@ -561,8 +627,8 @@
 
   function renderEmptyState() {
     var card = createElement("div", "empty-card");
-    var title = createElement("h2", "", "Non hai ancora radio salvate");
-    var text = createElement("p", "", "Usa l'ingranaggio per aggiungere una radio oppure vai su Cerca per trovarne una.");
+    var title = createElement("h2", "", "Non hai ancora preferiti");
+    var text = createElement("p", "", "Usa l'ingranaggio per aggiungere una radio oppure cerca qualcosa da ascoltare.");
     var actions = createElement("div", "empty-actions");
     var searchButton = createElement("button", "button button-secondary", "Cerca radio");
 
@@ -617,10 +683,10 @@
 
     actions.appendChild(playButton);
 
-    var saveButton = createElement("button", "button button-secondary", "Salva");
+    var saveButton = createFavoriteButton(station, "favorite-result-button");
     saveButton.type = "button";
     saveButton.addEventListener("click", function () {
-      saveSearchResult(station);
+      toggleFavorite(station);
     });
     actions.appendChild(saveButton);
 
@@ -679,6 +745,38 @@
     var badge = createElement("span", "current-badge", "In play");
     badge.hidden = true;
     return badge;
+  }
+
+  function createFavoriteButton(station, extraClassName) {
+    var button = createElement("button", "button favorite-button " + (extraClassName || ""), "");
+    var icon = createElement("span", "", "☆");
+    icon.setAttribute("aria-hidden", "true");
+    button.type = "button";
+    button.dataset.stationKey = stationKey(station);
+    button.appendChild(icon);
+    updateFavoriteButton(button, station);
+    return button;
+  }
+
+  function updateFavoriteButtons() {
+    Array.prototype.forEach.call(document.querySelectorAll(".favorite-button[data-station-key]"), function (button) {
+      updateFavoriteButton(button, { streamUrl: button.dataset.stationKey });
+    });
+
+    updatePlayerFavoriteButton();
+  }
+
+  function updateFavoriteButton(button, station) {
+    var favorite = isFavorite(station);
+    var icon = button.querySelector("span");
+    var label = favorite ? "Rimuovi dai preferiti" : "Aggiungi ai preferiti";
+
+    button.classList.toggle("is-favorite", favorite);
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    if (icon) {
+      icon.textContent = favorite ? "★" : "☆";
+    }
   }
 
   function updateStationCardStates() {
@@ -828,7 +926,7 @@
 
     var duplicate = findDuplicateByUrl(formStation.streamUrl, state.editingId);
     if (duplicate) {
-      showFormError("Esiste già una radio salvata con lo stesso URL stream.");
+      showFormError("Esiste già una radio nei preferiti con lo stesso URL stream.");
       return;
     }
 
@@ -843,7 +941,7 @@
     var persisted = addStation(formStation);
     clearFormFields();
     setActiveTab("radio");
-    showMessage(persisted ? "Radio salvata." : "Radio aggiunta solo per questa sessione: il salvataggio locale non è disponibile.", persisted ? "success" : "warning");
+    showMessage(persisted ? "Radio aggiunta ai preferiti." : "Radio aggiunta solo per questa sessione: il salvataggio locale non è disponibile.", persisted ? "success" : "warning");
   }
 
   function readStationForm() {
@@ -924,8 +1022,8 @@
   function updateFormMode() {
     var editing = Boolean(state.editingId);
     els.addTitle.textContent = editing ? "Modifica radio" : "Aggiungi radio";
-    els.addSubtitle.textContent = editing ? "Aggiorna i dati della radio salvata" : "Incolla l'URL dello stream e salva la radio";
-    els.saveStationBtn.textContent = editing ? "Salva modifiche" : "Salva radio";
+    els.addSubtitle.textContent = editing ? "Aggiorna i dati del preferito" : "Incolla l'URL dello stream e aggiungila ai preferiti";
+    els.saveStationBtn.textContent = editing ? "Salva modifiche" : "Aggiungi ai preferiti";
     els.cancelEditBtn.hidden = !editing;
     els.deleteEditBtn.hidden = !editing;
   }
@@ -1508,23 +1606,11 @@
       els.searchResults.appendChild(createStationCard(station, "search"));
     });
     updateStationCardStates();
+    updateFavoriteButtons();
   }
 
   function saveSearchResult(station) {
-    if (findDuplicateByUrl(station.streamUrl)) {
-      showMessage("Questa radio è già nei preferiti.", "warning");
-      return;
-    }
-
-    var persisted = addStation({
-      name: station.name,
-      streamUrl: station.streamUrl,
-      logoUrl: station.logoUrl,
-      notes: station.country ? "Trovata su Radio Browser - " + station.country : "Trovata su Radio Browser",
-      createdAt: new Date().toISOString()
-    });
-
-    showMessage(persisted ? "Radio salvata nei preferiti." : "Radio aggiunta solo per questa sessione: il salvataggio locale non è disponibile.", persisted ? "success" : "warning");
+    toggleFavorite(station);
   }
 
   function setSearchStatus(message) {
@@ -1712,6 +1798,8 @@
       els.playerTitle.textContent = "Nessuna radio selezionata";
       els.playerStatus.textContent = "Scegli una radio";
       els.audio.hidden = true;
+      els.playerFavoriteButton.disabled = true;
+      els.playerFavoriteButton.dataset.stationKey = "";
       els.playerToggleButton.disabled = true;
       setPlaybackStatus("idle");
       return;
@@ -1724,6 +1812,9 @@
     }
     els.playerTitle.textContent = state.currentStation.name;
     els.audio.hidden = false;
+    els.playerFavoriteButton.disabled = false;
+    els.playerFavoriteButton.dataset.stationKey = stationKey(state.currentStation);
+    updatePlayerFavoriteButton();
     els.playerToggleButton.disabled = false;
     updatePlayerButton();
   }
@@ -1795,6 +1886,23 @@
     updatePlayerButton();
     updatePlayerStatusText();
     updateStationCardStates();
+    updateFavoriteButtons();
+  }
+
+  function updatePlayerFavoriteButton() {
+    if (!els.playerFavoriteButton) {
+      return;
+    }
+
+    if (!state.currentStation) {
+      updateFavoriteButton(els.playerFavoriteButton, { streamUrl: "" });
+      els.playerFavoriteButton.disabled = true;
+      return;
+    }
+
+    els.playerFavoriteButton.disabled = false;
+    els.playerFavoriteButton.dataset.stationKey = stationKey(state.currentStation);
+    updateFavoriteButton(els.playerFavoriteButton, state.currentStation);
   }
 
   function updatePlayerStatusText() {

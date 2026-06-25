@@ -7,11 +7,11 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Radio">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>Le mie radio</title>
+    <title>Preferiti radio</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" href="icons/icon-192.png" sizes="192x192">
-    <link rel="stylesheet" href="style.css?v=20260618-1">
+    <link rel="stylesheet" href="style.css?v=20260625-1">
   </head>
   <body>
     <div class="app-shell">
@@ -34,8 +34,8 @@
       <main class="app-main">
         <section id="tab-radio" class="tab-panel" data-tab-panel="radio" aria-labelledby="radio-title">
           <header class="screen-header">
-            <h1 id="radio-title">Le mie radio</h1>
-            <p>Scegli una radio salvata</p>
+            <h1 id="radio-title">Preferiti</h1>
+            <p>Le radio che ascolti di più</p>
           </header>
 
           <div id="stationList" class="station-list" aria-live="polite"></div>
@@ -44,7 +44,7 @@
         <section id="tab-add" class="tab-panel" data-tab-panel="add" aria-labelledby="add-title" hidden>
           <header class="screen-header">
             <h1 id="add-title">Aggiungi radio</h1>
-            <p id="add-subtitle">Incolla l'URL dello stream e salva la radio</p>
+            <p id="add-subtitle">Incolla l'URL dello stream e aggiungila ai preferiti</p>
           </header>
 
           <form id="stationForm" class="card form-card" novalidate>
@@ -73,7 +73,7 @@
 
             <div class="form-actions">
               <button id="testPlayBtn" class="button button-secondary" type="button">Test Play</button>
-              <button id="saveStationBtn" class="button button-primary" type="submit">Salva radio</button>
+              <button id="saveStationBtn" class="button button-primary" type="submit">Aggiungi ai preferiti</button>
               <button id="clearFormBtn" class="button button-ghost" type="button">Cancella campi</button>
               <button id="cancelEditBtn" class="button button-ghost" type="button" hidden>Annulla modifica</button>
               <button id="deleteEditBtn" class="button button-danger" type="button" hidden>Elimina radio</button>
@@ -84,7 +84,7 @@
         <section id="tab-search" class="tab-panel" data-tab-panel="search" aria-labelledby="search-title" hidden>
           <header class="screen-header">
             <h1 id="search-title">Cerca radio</h1>
-            <p>Trova una radio online e salvala</p>
+            <p>Trova una radio online e aggiungila ai preferiti</p>
           </header>
 
           <form id="searchForm" class="card search-card" role="search">
@@ -124,6 +124,9 @@
         <p id="playerStatus" class="player-status">Fermata</p>
         <p id="playerError" class="player-error" role="alert" hidden></p>
       </div>
+      <button id="playerFavoriteButton" class="button favorite-button player-favorite-button" type="button" aria-label="Aggiungi ai preferiti" disabled>
+        <span aria-hidden="true">☆</span>
+      </button>
       <button id="playerToggleButton" class="button player-toggle-button" type="button" aria-label="Play" disabled>
         <span id="playerToggleIcon" aria-hidden="true">▶</span>
       </button>
@@ -135,6 +138,6 @@
       <button class="tab-button" type="button" data-tab="search">Cerca</button>
     </nav>
 
-    <script src="app.js?v=20260618-1" defer></script>
+    <script src="app.js?v=20260625-1" defer></script>
   </body>
 </html>
